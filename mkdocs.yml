@@ -1,0 +1,100 @@
+site_name: Confit
+
+repo_url: https://gitlab.eds.aphp.fr/datasciencetools/confit
+# repo_name: algorithms/pseudonymisation
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+  logo: assets/logo/aphp-white.svg
+  favicon: assets/logo/aphp-blue.svg
+  features:
+    - navigation.tracking
+    - navigation.instant
+    - navigation.indexes
+    - content.code.annotate
+
+nav:
+  - index.md
+  - alternatives.md
+  - getting_started.md
+  - Code Reference: reference/
+  - contributing.md
+  - changelog.md
+  - roadmap.md
+
+extra_css:
+  - assets/stylesheets/extra.css
+  - assets/termynal/termynal.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/vega@5
+  - https://cdn.jsdelivr.net/npm/vega-lite@5
+  - https://cdn.jsdelivr.net/npm/vega-embed@6
+  - assets/termynal/termynal.js
+
+watch:
+  - contributing.md
+  - roadmap.md
+  - changelog.md
+
+extra:
+  version:
+    provider: mike
+
+plugins:
+  - search
+  - bibtex:
+      bib_file: "docs/references.bib"
+  - gen-files:
+      scripts:
+        - docs/scripts/generate_reference.py
+        - docs/scripts/generate_development.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          selection:
+            docstring_style: numpy
+          rendering:
+            docstring_section_style: spacy
+            heading_level: 2
+            members_order: source
+            show_root_toc_entry: false
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: none
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+  - mike
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - footnotes
+  - md_in_html
+  - attr_list
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg

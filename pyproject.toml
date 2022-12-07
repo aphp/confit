@@ -1,0 +1,72 @@
+[tool.poetry]
+name = "confit"
+version = "0.1.0"
+description = "Smart text extraction from PDF documents"
+authors = [
+    "Perceval Wajsburt <perceval.wajsburt-ext@aphp.fr>",
+    "Thomas Petit-Jean <thomas.petitjean@aphp.fr>",
+    "Adam Remaki <adam.remaki@aphp.fr>",
+    "Alice Calliger <alice.calliger@aphp.fr>"
+]
+license = "BSD-3"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">3.7.6,<4.0,!=3.8.1"
+pydantic = "^1.2"
+catalogue = "^2.0.7"
+typer = "^0.6.1"
+srsly = "^2.4.4"
+
+[tool.poetry.group.dev.dependencies]
+black = "22.6.0"
+flake8 = ">=3.0"
+pre-commit = "^2.18.1"
+pytest = "^7.1.1"
+pytest-cov = "^3.0.0"
+mike = "^1.1.2"
+mkdocs-bibtex = "^2.0.3"
+mkdocs-gen-files = "^0.3.4"
+mkdocs-literate-nav = "^0.4.1"
+mkdocs-material = "^8.2.8"
+mkdocstrings = "^0.18.1"
+mkdocstrings-python = "^0.6.6"
+mypy = "^0.950"
+mkdocs-glightbox = "^0.1.6"
+mkdocs-autorefs = "^0.4.1"
+coverage = "^6.5.0"
+
+[tool.interrogate]
+ignore-init-method = true
+ignore-init-module = true
+ignore-magic = false
+ignore-semiprivate = false
+ignore-private = false
+ignore-property-decorators = false
+ignore-module = true
+ignore-nested-functions = false
+ignore-nested-classes = true
+ignore-setters = false
+fail-under = 8
+exclude = ["docs", "build", "tests"]
+verbose = 0
+quiet = false
+whitelist-regex = []
+color = true
+omit-covered-files = false
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+
+[tool.mypy]
+plugins = "pydantic.mypy"
+
+[build-system]
+requires = ["poetry-core", "cython", "setuptools<=63"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.dephell.main]
+from = {format = "poetry", path = "pyproject.toml"}
+to = {format = "setuppy", path = "setup.py"}

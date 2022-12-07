@@ -24,7 +24,7 @@ Linting:
     - pre-commit run --all-files
   only:
     refs:
-      - master
+      - main
       - merge_request
 
 Running Pytest:
@@ -60,7 +60,7 @@ Running Pytest:
 
   only:
     refs:
-      - master
+      - main
       - merge_request
 
 Installation:
@@ -69,7 +69,7 @@ Installation:
     - pip install . --extra-index-url "https://gitlab-ci-token:$CI_JOB_TOKEN@$GITLAB_REGISTRY"
   only:
     refs:
-      - master
+      - main
       - merge_request
 
 Test documentation:
@@ -113,7 +113,7 @@ pages:
     paths:
       - public
   only:
-    - master
+    - main
 
 Package:
   stage: package

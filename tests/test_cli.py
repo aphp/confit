@@ -48,7 +48,7 @@ def function(modelA: BigModel, modelB: BigModel, other: int, seed: int):
     print("Other:", other)
 
 
-def test_cli_working():
+def test_cli_working(change_test_dir):
     result = runner.invoke(
         app,
         [
@@ -66,7 +66,7 @@ def test_cli_working():
     assert "Other: 4" in result.stdout
 
 
-def test_cli_missing():
+def test_cli_missing(change_test_dir):
     result = runner.invoke(
         app,
         [

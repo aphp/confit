@@ -25,7 +25,7 @@ theme:
 nav:
   - index.md
   - alternatives.md
-  - getting_started.md
+  - getting-started.md
   - Code Reference: reference/
   - contributing.md
   - changelog.md

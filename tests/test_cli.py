@@ -1,0 +1,82 @@
+import datetime
+
+from typer.testing import CliRunner
+
+from confit import Cli, Registry
+from confit.registry import set_default_registry
+
+runner = CliRunner()
+
+
+@set_default_registry
+class RegistryCollection:
+    factory = Registry(("test_cli", "factory"), entry_points=True)
+
+    _catalogue = dict(
+        factory=factory,
+    )
+
+
+registry = RegistryCollection()
+
+
+class CustomClass:
+    pass
+
+
+@registry.factory.register("submodel")
+class SubModel:
+    def __init__(self, value: float, desc: str = ""):
+        self.value = value
+        self.desc = desc
+
+
+@registry.factory.register("bigmodel")
+class BigModel:
+    def __init__(self, date: datetime.date, submodel: SubModel):
+        self.date = date
+        self.submodel = submodel
+
+
+app = Cli(pretty_exceptions_show_locals=False)
+
+
+@app.command(name="script")
+def function(modelA: BigModel, modelB: BigModel, other: int, seed: int):
+    assert modelA.submodel is modelB.submodel
+    assert modelA.date == datetime.date(2010, 10, 10)
+    print("Other:", other)
+
+
+def test_cli_working():
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            "config.cfg",
+            "--modelA.date",
+            "2010-10-10",
+            "--other",
+            "4",
+            "--seed",
+            "42",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Other: 4" in result.stdout
+
+
+def test_cli_missing():
+    result = runner.invoke(
+        app,
+        [
+            "--modelA.date",
+            "2010-10-10",
+            "--other",
+            "4",
+            "--seed",
+            "42",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "Validation error" in result.stdout

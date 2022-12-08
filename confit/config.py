@@ -13,6 +13,7 @@ import srsly
 import typer
 from pydantic import ValidationError
 from pydantic.error_wrappers import ErrorWrapper
+from pydantic.schema import encode_default
 
 from confit.registry import get_default_registry
 from confit.utils.collections import dedup
@@ -162,14 +163,6 @@ def config_literal_eval(s):
             return s
 
 
-def config_literal_dump(v: Any):
-    if isinstance(v, str):
-        if config_literal_eval(str(v)) == v:
-            return str(v)
-        return srsly.json_dumps(v)
-    return srsly.json_dumps(v)
-
-
 def flatten_sections(root: Dict[str, Any]) -> Dict[str, Any]:
     res = collections.defaultdict(lambda: {})
 
@@ -237,6 +230,12 @@ class MissingReference(Exception):
 
 class Config(dict):
     def __init__(self, *args, **kwargs):
+        """
+        The configuration system consists of a supercharged dict, the `Config` class,
+        that can be used to read and write to `cfg` files, interpolate variables and
+        instantiate components through the registry with some special `@factory` keys.
+        A cfg file can be used directly as an input to a CLI-decorated function.
+        """
         if len(args) == 1 and isinstance(args[0], dict):
             assert len(kwargs) == 0
             kwargs = args[0]
@@ -252,6 +251,23 @@ class Config(dict):
 
     @classmethod
     def from_str(cls, s: str, resolve: bool = False, registry: Any = None) -> "Config":
+        """
+        Load a config object from a config string
+
+        Parameters
+        ----------
+        s: Union[str, Path]
+            The cfg config string
+        resolve
+            Whether to resolve sections with '@' keys
+        registry
+            Optional registry to resolve from.
+            If None, the default registry will be used.
+
+        Returns
+        -------
+        Config
+        """
         parser = ConfigParser()
         parser.optionxform = str
         parser.read_string(s)
@@ -281,14 +297,45 @@ class Config(dict):
     def from_disk(
         cls, path: Union[str, Path], resolve: bool = False, registry: Any = None
     ) -> "Config":
-        s = Path(path).read_text(path)
+        """
+        Load a config object from a '.cfg' file
+
+        Parameters
+        ----------
+        path: Union[str, Path]
+            The path to the config object
+        resolve
+            Whether to resolve sections with '@' keys
+        registry
+            Optional registry to resolve from.
+            If None, the default registry will be used.
+
+        Returns
+        -------
+        Config
+        """
+        s = Path(path).read_text()
         return cls.from_str(s, resolve=resolve, registry=registry)
 
     def to_disk(self, path: Union[str, Path]):
+        """
+        Export a config to the disk (usually to a .cfg file)
+
+        Parameters
+        ----------
+        path: Union[str, path]
+        """
         s = self.to_str()
         Path(path).write_text(s)
 
     def to_str(self):
+        """
+        Export a config to the disk (usually to a .cfg file)
+        Non config parts of the tree will be serialized:
+        - using references `${section.reference}` for used parts of the tree
+        - using the `.cfg` member is set (auto assigned for any decorated object)
+        - using json syntax of pydantic encoded values in other cases
+        """
         refs = {}
 
         additional_sections = {}
@@ -308,7 +355,7 @@ class Config(dict):
                 else:
                     return {k: prepare(v, (*path, k)) for k, v in o.items()}
             try:
-                return srsly.json_dumps(o)
+                return srsly.json_dumps(encode_default(o))
             except TypeError:
                 pass
             try:
@@ -336,6 +383,28 @@ class Config(dict):
         return s.getvalue()
 
     def resolve(self, _path=(), leaves=None, deep=True, registry: Any = None):
+        """
+        Resolves the parts of the nested config object with @ variables using
+        a registry, and then interpolate references in the config.
+        These sections are
+
+        Parameters
+        ----------
+        _path: Sequence[str]
+            Internal variable
+            Current path in tree
+        leaves: Optional[Dict]
+            Internal variable
+            mapping from path to tree leaves
+        deep: bool
+            Should we resolve deeply
+        registry:
+            Registry to use when resolving
+
+        Returns
+        -------
+        Union[Config, Any]
+        """
         if registry is None:
             registry = get_default_registry()
         copy = Config(**self)

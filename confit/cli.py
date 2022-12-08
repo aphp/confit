@@ -61,7 +61,7 @@ class Cli(Typer):
             @typer_command
             def command(ctx: Context, config: Optional[Path] = None):
                 if config is not None:
-                    config = Config.from_str(Path(config).read_text(), resolve=False)
+                    config = Config.from_disk(config, resolve=False)
                 else:
                     config = Config({name: {}})
                 for k, v in parse_overrides(ctx.args).items():

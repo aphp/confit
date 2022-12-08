@@ -31,3 +31,4 @@ def get_default_registry():
 def set_default_registry(registry):
     global _default_registry
     _default_registry = registry
+    return registry

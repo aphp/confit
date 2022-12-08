@@ -8,7 +8,7 @@ from confit.config import MissingReference, Reference
 
 
 class RegistryCollection:
-    factory = Registry(("mytest", "factory"), entry_points=True)
+    factory = Registry(("test_config", "factory"), entry_points=True)
 
     _catalogue = dict(
         factory=factory,
@@ -32,7 +32,7 @@ class SubModel:
 @registry.factory.register("bigmodel")
 class BigModel:
     def __init__(self, date: datetime.date, submodel: SubModel):
-        self.datetime = date
+        self.date = date
         self.submodel = submodel
 
 
@@ -138,7 +138,7 @@ def test_missing_error():
 def test_type_hinted_instantiation_error():
     @validate_arguments
     def function(embedding: SubModel):
-        ...
+        pass
 
     params = Config.from_str(
         """

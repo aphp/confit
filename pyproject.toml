@@ -35,6 +35,7 @@ mypy = "^0.950"
 mkdocs-glightbox = "^0.1.6"
 mkdocs-autorefs = "^0.4.1"
 coverage = "^6.5.0"
+torch = "<1.13"
 
 [tool.interrogate]
 ignore-init-method = true

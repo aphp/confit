@@ -14,8 +14,8 @@ theme:
       toggle:
         icon: material/brightness-7
         name: Switch to light mode
-  logo: assets/logo/aphp-white.svg
-  favicon: assets/logo/aphp-blue.svg
+  logo: assets/logo/logo.png
+  favicon: assets/logo/logo.png
   features:
     - navigation.tracking
     - navigation.instant

@@ -64,6 +64,5 @@ def safe_eval(source: str, locals_dict=None):
     transformer.visit(tree)
     clause = compile(tree, "<AST>", "eval")
     result = eval(clause, {"__builtins__": {}}, locals_dict)
-    print("EVAL", source, locals_dict, result)
 
     return result

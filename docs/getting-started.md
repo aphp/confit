@@ -12,7 +12,7 @@ $ pip install confit
 
 </div>
 
-## Example
+## A simple example
 
 Confit only abstracts the boilerplate code related to configuration and
 leaves the rest of your code unchanged.
@@ -22,7 +22,8 @@ Here is an example:
 <h5 a><strong><code>script.py</code></strong></h5>
 
 ```diff
-+ from confit import Cli, Registry, set_default_registry
+import datetime
++ from confit import Cli, Registry, get_default_registry, set_default_registry
 
 + app = Cli(pretty_exceptions_show_locals=False)
 
@@ -33,6 +34,8 @@ Here is an example:
 +     _catalogue = dict(
 +         factory=factory,
 +     )
+
++ registry = get_default_registry()
 
 + @registry.factory.register("submodel")
 class SubModel:
@@ -73,7 +76,7 @@ modelB = ${modelB}
 # CLI common parameters
 [modelA]
 @factory = "bigmodel"
-date = "2003-02-01"
+date = "2010-10-10"
 
 [modelA.submodel]
 @factory = "submodel"

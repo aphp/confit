@@ -22,11 +22,19 @@ class CustomClass:
     pass
 
 
+class HeldValue:
+    def __init__(self):
+        self.value = "A value!"
+
+
 @registry.factory.register("submodel")
 class SubModel:
     def __init__(self, value: float, desc: str = ""):
         self.value = value
         self.desc = desc
+
+        self.hidden_value = 5
+        self.heldvalue = HeldValue()
 
 
 @registry.factory.register("bigmodel")
@@ -35,11 +43,17 @@ class BigModel:
         self.date = date
         self.submodel = submodel
 
+        self.hidden_value = 10
+
+    def get_hidden_value(self):
+        return self.hidden_value
+
 
 pipeline_config = """\
 [script]
 modelA = ${modelA}
 modelB = ${modelB}
+hidden_value = ${modelA:hidden_value}
 
 [modelA]
 date = "2003-02-01"
@@ -70,7 +84,11 @@ def test_read_from_str():
             "date": "2003-04-05",
             "submodel": Reference("modelA.submodel"),
         },
-        "script": {"modelA": Reference("modelA"), "modelB": Reference("modelB")},
+        "script": {
+            "modelA": Reference("modelA"),
+            "modelB": Reference("modelB"),
+            "hidden_value": Reference("modelA:hidden_value"),
+        },
     }
     resolved = config.resolve(registry=registry)
     assert isinstance(resolved["modelA"].submodel, SubModel)
@@ -113,6 +131,76 @@ d = 12
         "d": 12,
     }
     function(**params)
+
+
+def test_list_of_interpolated():
+    config = """
+[params]
+l = [${values.a}, ${values.b}] # A list of values
+
+[values]
+a = 1
+b = 2
+"""
+    params = Config.from_str(config).resolve()["params"]
+    assert params == {"l": [1, 2]}
+
+
+def test_operations_inside_interpolation():
+    config = """
+[params]
+sum = ${values.a+10}
+
+[values]
+a = 1
+"""
+    params = Config.from_str(config).resolve()["params"]
+    assert params == {"sum": 11}
+
+
+def test_ilegal_interpolation():
+    config = """\
+[script]
+modelA = ${modelA}
+modelB = ${modelB}
+hidden_value = ${modelA:get_hidden_value()}
+
+[modelA]
+date = "2003-02-01"
+@factory = "bigmodel"
+
+[modelA.submodel]
+@factory = "submodel"
+value = 12
+
+"""
+    config = Config().from_str(config)
+    with pytest.raises(RuntimeError):
+        config.resolve(registry=registry)
+
+
+def test_deep_interpolations():
+    pipeline_config = """\
+[script]
+modelA = ${modelA}
+value = ${modelA.submodel.value}
+hidden_value = ${modelA.submodel:hidden_value}
+held_value = ${modelA.submodel:heldvalue.value}
+
+[modelA]
+date = "2003-02-01"
+@factory = "bigmodel"
+
+[modelA.submodel]
+@factory = "submodel"
+value = 12
+
+"""
+
+    config = Config().from_str(pipeline_config)
+    resolved = config.resolve(registry=registry)
+    assert resolved["script"]["value"] == 12
+    assert resolved["script"]["hidden_value"] == 5
 
 
 def test_dump_error():

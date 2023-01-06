@@ -17,6 +17,7 @@ from pydantic.schema import encode_default
 
 from confit.registry import get_default_registry
 from confit.utils.collections import dedup
+from confit.utils.eval import safe_eval
 
 
 def validate_arguments(func: Optional[Callable] = None, *, config: Dict = None) -> Any:
@@ -30,7 +31,6 @@ def validate_arguments(func: Optional[Callable] = None, *, config: Dict = None) 
     def validate(_func: Callable) -> Callable:
 
         if isinstance(_func, type):
-
             if hasattr(_func, "raw_function"):
                 vd = pydantic.decorator.ValidatedFunction(_func.raw_function, config)
             else:
@@ -152,8 +152,21 @@ def parse_override(value: Any) -> Any:
 
 
 def config_literal_eval(s):
+    s = s.split("#")[0].strip()
     if s.startswith("${") and s.endswith("}"):
         return Reference(s[2:-1])
+    elif s.startswith("{") and s.endswith("}"):
+        items = {}
+        for item in s[1:-1].split(","):
+            k, v = map(lambda s: s.strip(), item.split(":"))
+            items[k] = config_literal_eval(v)
+        return Reference(items)
+    elif s.startswith("[") and s.endswith("]"):
+        items = []
+        for item in s[1:-1].split(","):
+            item = item.strip()
+            items.append(config_literal_eval(item))
+        return Reference(items)
     try:
         return literal_eval(s)
     except ValueError:
@@ -194,27 +207,65 @@ def split_path(path):
         result.append(next((g for g in match.groups() if g is not None)))
         if offset == len(path):
             break
-    return result
+    return tuple(result)
 
 
 class Reference:
     def __init__(self, value):
         self.value = value
+        self.from_attributes = ":" in value
 
     def __eq__(self, other):
         return isinstance(other, Reference) and self.value == other.value
 
     def __str__(self):
-        return self.value
+        return str(self.value)
 
     def __len__(self):
         return len(self.value)
 
     def __hash__(self):
-        return hash(self.value)
+        return hash(tuple(self.value))
 
     def __repr__(self):
         return "${{{}}}".format(self.value)
+
+    def resolve(self, leaves, value=None):
+        value = value if value is not None else self.value
+        if isinstance(value, Reference):
+            return value.resolve_single(leaves)
+        elif type(value) == str:
+            return self.resolve_single(leaves, value)
+        elif type(value) == dict:
+            resolved = {}
+            for k, v in self.value.items():
+                resolved[k] = self.resolve(leaves, value=v)
+            return resolved
+        elif type(value) == list:
+            return [self.resolve(leaves, value=v) for v in value]
+        else:
+            return value
+
+    def resolve_single(self, leaves, value=None):
+        pat = re.compile(r"((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)(?:[:]|$)")
+        pat = re.compile(r"((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)\:?")
+
+        local_leaves = {}
+        local_names = {}
+        for i, (key, val) in enumerate(leaves.items()):
+            local_leaves[f"var_{i}"] = val
+            local_names[key] = f"var_{i}"
+
+        def replace(match):
+            has_deuxpoints = match.group().endswith(":")
+            var = match.group().rstrip(":")
+            path = split_path(var)
+            return local_names.get(path, var) + ("." if has_deuxpoints else "")
+
+        replaced = pat.sub(replace, value or self.value)
+        res = safe_eval(replaced, local_leaves)
+
+        return res
 
 
 class MissingReference(Exception):
@@ -425,11 +476,13 @@ class Config(dict):
                         copy[key] = leaves[(*_path, key)]
                     elif isinstance(value, Reference):
                         try:
-                            leaves[(*_path, key)] = leaves[tuple(split_path(value))]
-                        except KeyError:
+                            leaves[(*_path, key)] = value.resolve(leaves)
+                        except (KeyError, NameError):
                             raise MissingReference([value])
                         else:
                             copy[key] = leaves[(*_path, key)]
+                    else:
+                        leaves[(*_path, key)] = value
 
                 except MissingReference as e:
                     traced_missing_values.extend(e.references)

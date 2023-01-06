@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "confit"
-version = "0.1.0"
-description = "Smart text extraction from PDF documents"
+version = "0.1.1"
+description = "Smart configuration framework"
 authors = [
     "Perceval Wajsburt <perceval.wajsburt-ext@aphp.fr>",
     "Thomas Petit-Jean <thomas.petitjean@aphp.fr>",

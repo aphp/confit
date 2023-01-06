@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.1.0 - ??
+## v0.1.1 - 06-01-2023
+
+### Features
+
+- Enhanced references capabilities
+
+## v0.1.0 - 30-12-2022
 
 Inception ! :tada:
 

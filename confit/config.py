@@ -97,7 +97,8 @@ def validate_arguments(func: Optional[Callable] = None, *, config: Dict = None) 
 
             @wraps(_func)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                return vd.call(*args, **kwargs)
+                result = vd.call(*args, **kwargs)
+                return result
 
             wrapper_function.vd = vd  # type: ignore
             wrapper_function.validate = vd.init_model_instance  # type: ignore
@@ -228,6 +229,8 @@ class Reference:
         return hash(tuple(self.value))
 
     def __repr__(self):
+        if type(self.value) == list:
+            return repr(self.value)
         return "${{{}}}".format(self.value)
 
     def resolve(self, leaves, value=None):
@@ -247,7 +250,6 @@ class Reference:
             return value
 
     def resolve_single(self, leaves, value=None):
-        pat = re.compile(r"((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)(?:[:]|$)")
         pat = re.compile(r"((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)\:?")
 
         local_leaves = {}
@@ -405,6 +407,9 @@ class Config(dict):
                     return "${" + join_path(o.__path__) + "}"
                 else:
                     return {k: prepare(v, (*path, k)) for k, v in o.items()}
+
+            if isinstance(o, list):
+                return [prepare(v, (*path, i)) for i, v in enumerate(o)]
             try:
                 return srsly.json_dumps(encode_default(o))
             except TypeError:
@@ -521,6 +526,8 @@ class Config(dict):
                         registries[0][0]: registries[0][1],
                         **instance.cfg,
                     }
+                else:
+                    instance.cfg = self
                 return instance
             except ValidationError as e:
                 raise ValidationError(patch_errors(e.raw_errors), e.model)

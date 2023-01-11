@@ -1,3 +1,4 @@
+import inspect
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Type, Union
@@ -60,8 +61,16 @@ class Cli(Typer):
 
             @typer_command
             def command(ctx: Context, config: Optional[Path] = None):
-                if config is not None:
-                    config = Config.from_disk(config, resolve=False)
+                config_path = config
+                has_meta = fn_has_meta(fn)
+                if config_path is not None:
+                    name_from_file = config_path.stem
+                    config = Config.from_disk(config_path, resolve=False)
+                    if ("name" in inspect.signature(fn).parameters) and (
+                        config.get(name, {}).get("name", False) is None
+                    ):
+                        # We use the config file name
+                        config[name]["name"] = name_from_file
                 else:
                     config = Config({name: {}})
                 for k, v in parse_overrides(ctx.args).items():
@@ -83,14 +92,23 @@ class Cli(Typer):
                         current = current.setdefault(part, Config())
                     current[parts[-1]] = v
                 try:
+                    resolved_config = config.resolve()
                     default_seed = validated.model.__fields__.get("seed")
                     seed = config.get(name, {}).get("seed", default_seed)
                     if seed is not None:
                         set_seed(seed)
-
-                    config = config.resolve()
-
-                    return validated(**config.get(name, {}))
+                    if has_meta:
+                        config_meta = dict(
+                            config_path=config_path,
+                            resolved_config=config.resolve(),
+                            unresolved_config=config,
+                        )
+                        return validated(
+                            **resolved_config.get(name, {}),
+                            config_meta=config_meta,
+                        )
+                    else:
+                        return validated(**resolved_config.get(name, {}))
                 except ValidationError as e:
                     print("\x1b[{}m{}\x1b[0m".format("38;5;1", "Validation error"))
                     print(str(e))
@@ -99,3 +117,7 @@ class Cli(Typer):
             return validated
 
         return wrapper
+
+
+def fn_has_meta(fn):
+    return "config_meta" in inspect.signature(fn).parameters

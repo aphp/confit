@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "confit"
-version = "0.1.1"
+version = "0.1.2"
 description = "Smart configuration framework"
 authors = [
     "Perceval Wajsburt <perceval.wajsburt-ext@aphp.fr>",

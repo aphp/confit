@@ -80,3 +80,38 @@ def test_cli_missing(change_test_dir):
     )
     assert result.exit_code == 1
     assert "Validation error" in result.stdout
+
+
+app_with_meta = Cli(pretty_exceptions_show_locals=False)
+
+
+@app_with_meta.command(name="script")
+def function(
+    modelA: BigModel, modelB: BigModel, other: int, seed: int, config_meta=None
+):
+
+    assert modelA.submodel is modelB.submodel
+    assert modelA.date == datetime.date(2010, 10, 10)
+
+    config = config_meta["resolved_config"]
+
+    assert config["modelA"].submodel.value == 12
+    print("Other:", other)
+
+
+def test_cli_working_with_meta(change_test_dir):
+    result = runner.invoke(
+        app_with_meta,
+        [
+            "--config",
+            "config.cfg",
+            "--modelA.date",
+            "2010-10-10",
+            "--other",
+            "4",
+            "--seed",
+            "42",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Other: 4" in result.stdout

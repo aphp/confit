@@ -82,6 +82,24 @@ def test_cli_missing(change_test_dir):
     assert "Validation error" in result.stdout
 
 
+def test_cli_merge(change_test_dir):
+    result = runner.invoke(
+        app,
+        [
+            "--config",
+            "config.cfg",
+            "--config",
+            "config-add.cfg",
+            "--modelA.date",
+            "2010-10-10",
+            "--seed",
+            "42",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "Other: 99" in result.stdout
+
+
 app_with_meta = Cli(pretty_exceptions_show_locals=False)
 
 

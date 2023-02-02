@@ -95,10 +95,13 @@ and run the following command from the terminal
 $ python script.py --config config.cfg --seed 42
 ```
 
+</div>
 !!! tip "Naming"
     To use the name of your config path (e.g. `config-expe-2` if the configuration file is named `config-expe-2.cfg` *in** the configuration (after resolution), simply mention `name = None` under the section which title was provided at `@app.command(name=<section-title>)`
 
-</div>
+!!! tip "Multiple configurations"
+    You can pass multiple configuration files by repeating the `--config` option. Configuration will be merged in order.
+
 
 You can still call the `function` method from your code, but now also benefit from
 argument validation !

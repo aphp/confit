@@ -604,3 +604,21 @@ class Config(dict):
             u = deepcopy(u)
             rec(config, u)
         return Config(**config)
+
+
+def merge_from_disk(
+    config_paths: Union[Path, List[Path]],
+    returned_name: str = "first",
+):
+
+    assert returned_name in {"first", "concat"}
+    if isinstance(config_paths, Path):
+        config_paths = [config_paths]
+
+    configs = [Config.from_disk(p, resolve=False) for p in config_paths]
+    config_names = [p.stem for p in config_paths]
+
+    name = config_names[0] if returned_name == "first" else "+".join(config_names)
+
+    config = configs.pop(0)
+    return config.merge(*configs), name

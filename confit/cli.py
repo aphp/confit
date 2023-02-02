@@ -1,14 +1,14 @@
 import inspect
 import sys
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pydantic import ValidationError
 from typer import Context, Typer
 from typer.core import TyperCommand
 from typer.models import CommandFunctionType, Default
 
-from .config import Config, parse_overrides, validate_arguments
+from .config import Config, merge_from_disk, parse_overrides, validate_arguments
 from .utils.random import set_seed
 
 
@@ -60,12 +60,13 @@ class Cli(Typer):
             validated = validate_arguments(fn)
 
             @typer_command
-            def command(ctx: Context, config: Optional[Path] = None):
+            def command(ctx: Context, config: Optional[List[Path]] = None):
                 config_path = config
+
                 has_meta = fn_has_meta(fn)
-                if config_path is not None:
-                    name_from_file = config_path.stem
-                    config = Config.from_disk(config_path, resolve=False)
+                if config_path:
+                    config, name_from_file = merge_from_disk(config_path)
+
                     if ("name" in inspect.signature(fn).parameters) and (
                         config.get(name, {}).get("name", False) is None
                     ):

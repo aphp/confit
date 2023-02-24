@@ -1,0 +1,244 @@
+from json.encoder import py_encode_basestring_ascii
+from typing import Any, Callable
+
+from lark import Lark, Transformer, Tree
+
+
+class Reference(str):
+    """
+    A path reference to a value in the configuration.
+    """
+
+
+# Extended JSON grammar to parse references and tuples
+# and ignore Python-style comments.
+xjson_grammar = r"""
+    ?value: dict
+          | list
+          | tuple
+          | string
+          | SIGNED_NUMBER      -> number
+          | "Infinity"         -> plus_inf
+          | "-Infinity"        -> minus_inf
+          | "NaN"              -> nan
+          | "true"             -> true
+          | "true"             -> true
+          | "True"             -> true
+          | "false"            -> false
+          | "False"            -> false
+          | "null"             -> null
+          | "None"             -> null
+          | reference
+
+    list : "[" [value ("," value) * ","?] "]"
+    tuple : "(" [value ("," value) * ","?] ")"
+
+    dict : "{" [pair ("," pair)*] "}"
+    pair : string ":" value
+
+    string : ESCAPED_STRING
+    reference : "${" reference_content "}"
+    !reference_content : NON_BRACES ? ( "{" reference_content "}" ? ) *
+    NON_BRACES : /[^{}]+/
+
+    VARNAME : ("_"|"-"|LETTER) ("_"|"-"|LETTER|DIGIT)*
+    COMMENT: /#[^\n]*/
+
+    %import common.ESCAPED_STRING
+    %import common.LETTER
+    %import common.DIGIT
+    %import common.SIGNED_NUMBER
+    %import common.WS
+    %ignore WS
+    %ignore COMMENT
+    """
+
+
+class XJsonTransformer(Transformer):
+    """
+    A Lark transformer to parse extended JSON.
+    """
+
+    def __init__(self, input_string):
+        super().__init__()
+        self.input_string = input_string
+
+    def string(self, s):
+        """Parse string"""
+        (s,) = s
+        return s[1:-1]
+
+    def number(self, n):
+        """Parse number"""
+        (n,) = n
+        return float(n)
+
+    def reference(self, tree: Tree):
+        """Parse reference"""
+        meta = tree[0].meta
+        return Reference(self.input_string[meta.start_pos : meta.end_pos])
+
+    list = list
+    tuple = tuple
+    pair = tuple
+    dict = dict
+
+    def null(self, _):
+        """Parse null"""
+        return None
+
+    def true(self, _):
+        """Parse true"""
+        return True
+
+    def false(self, _):
+        """Parse false"""
+        return False
+
+    def plus_inf(self, _):
+        """Parse infinity"""
+        return float("inf")
+
+    def minus_inf(self, _):
+        """Parse -infinity"""
+        return -float("inf")
+
+    def nan(self, _):
+        """Parse nan"""
+        return -float("nan")
+
+
+_json_parser = Lark(
+    xjson_grammar, start="value", parser="lalr", propagate_positions=True
+)
+
+
+def _floatstr(o, _repr=float.__repr__, _inf=float("inf"), _neginf=-float("inf")):
+    if o != o:
+        text = "NaN"
+    elif o == _inf:
+        text = "Infinity"
+    elif o == _neginf:
+        text = "-Infinity"
+    else:
+        return _repr(o)
+
+    return text
+
+
+def _make_iterencode(
+    floatstr: Callable[[float], str] = _floatstr,
+    encoder: Callable[[str], str] = py_encode_basestring_ascii,
+    intstr: Callable[[int], str] = int.__repr__,
+    separator=",",
+):
+    """
+    Heavily inspired by Python's `json.encoder._make_iterencode`
+    The main difference is that it allows to encode `Reference` and `tuple` objects.
+
+    Parameters
+    ----------
+    floatstr: Callable[[float], str]
+        Float serializer
+    encoder: Callable[[str], str]
+        String serializer
+    intstr: Callable[[int], str]
+        Int serializer
+    separator: str
+        JSON separator
+
+    Returns
+    -------
+    Callable[[Any], Iterator[str]]
+    """
+
+    def _iterencode_sequence_content(o):
+        first = True
+        for value in o:
+            if not first:
+                yield separator + " "
+            first = False
+            yield from _iterencode(value)
+
+    def _iterencode_list(o):
+        yield "["
+        yield from _iterencode_sequence_content(o)
+        yield "]"
+
+    def _iterencode_tuple(o):
+        yield "("
+        yield from _iterencode_sequence_content(o)
+        yield ")"
+
+    def _iterencode_dict(o):
+        yield "{"
+        first = True
+        for key, value in o.items():
+            if not first:
+                yield separator + " "
+            first = False
+            assert isinstance(key, str)
+            yield "{}: ".format(encoder(key))
+            yield from _iterencode(value)
+        yield "}"
+
+    def _iterencode(o):
+        if isinstance(o, Reference):
+            yield "${" + o + "}"
+        elif isinstance(o, str):
+            yield encoder(o)
+        elif o is None:
+            yield "null"
+        elif o is True:
+            yield "true"
+        elif o is False:
+            yield "false"
+        elif isinstance(o, int):
+            yield intstr(o)
+        elif isinstance(o, float):
+            yield floatstr(o)
+        elif isinstance(o, list):
+            yield from _iterencode_list(o)
+        elif isinstance(o, tuple):
+            yield from _iterencode_tuple(o)
+        elif isinstance(o, dict):
+            yield from _iterencode_dict(o)
+        else:
+            raise TypeError("Cannot serialize {}".format(o))
+
+    return _iterencode
+
+
+def loads(s: str):
+    """
+    Load an extended JSON string into a python object.
+    Takes care of detecting references and tuples
+
+    Parameters
+    ----------
+    s: str
+
+    Returns
+    -------
+    Any
+    """
+    try:
+        return XJsonTransformer(s).transform(_json_parser.parse(s))
+    except Exception:
+        return s
+
+
+def dumps(o: Any):
+    """
+    Dump a python object into an extended JSON string.
+    Takes care of serializing references and tuples
+
+    Parameters
+    ----------
+    o: Any
+
+    Returns
+    -------
+    str
+    """
+    return "".join(_make_iterencode()(o))

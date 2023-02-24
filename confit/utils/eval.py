@@ -1,7 +1,12 @@
 import ast
+from typing import Any, Dict, Optional
 
 
 class Transformer(ast.NodeTransformer):
+    """
+    An ast NodeTransformer that only allows a subset of the Python AST.
+    """
+
     ALLOWED_NODE_TYPES = set(
         [
             "Expression",
@@ -18,6 +23,7 @@ class Transformer(ast.NodeTransformer):
             "Num",
             "List",
             "Dict",
+            "Set",
             "Add",
             "Sub",
             "Mult",
@@ -48,6 +54,9 @@ class Transformer(ast.NodeTransformer):
     )
 
     def generic_visit(self, node):
+        """
+        Checks that the node type is allowed.
+        """
         nodetype = type(node).__name__
         if nodetype not in self.ALLOWED_NODE_TYPES:
             raise RuntimeError(f"Invalid expression: {nodetype} not allowed !")
@@ -58,7 +67,24 @@ class Transformer(ast.NodeTransformer):
 transformer = Transformer()
 
 
-def safe_eval(source: str, locals_dict=None):
+def safe_eval(source: str, locals_dict: Optional[Dict[str, Any]] = None):
+    """
+    Evaluate a Python string expression in a safe way.
+    For instance, imports, function calls and builtins are disabled.
+
+
+    Parameters
+    ----------
+    source: str
+        The expression to evaluate
+    locals_dict: Optional[Dict[str, Any]]
+        The local variables to use in the evaluation
+
+    Returns
+    -------
+    Any
+        The result of the evaluation
+    """
     tree = ast.parse(source, mode="eval")
 
     transformer.visit(tree)

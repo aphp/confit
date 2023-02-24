@@ -5,6 +5,7 @@ from pydantic import ValidationError, validate_arguments
 
 from confit import Config, Registry
 from confit.config import MissingReference, Reference
+from confit.utils.xjson import dumps, loads
 
 
 class RegistryCollection:
@@ -61,7 +62,7 @@ date = "2003-02-01"
 
 [modelA.submodel]
 @factory = "submodel"
-value = 12
+value = 12.0
 
 [modelB]
 date = "2003-04-05"
@@ -108,6 +109,85 @@ def test_write_to_str():
 
     exported = reexport(pipeline_config)
     assert reexport(exported) == exported
+
+
+def test_write_resolved_to_str():
+    s = Config().from_str(pipeline_config, resolve=True, registry=registry)
+    assert (
+        s.to_str()
+        == """\
+[script]
+modelA = ${modelA}
+modelB = ${modelB}
+hidden_value = 10
+
+[modelA]
+date = "2003-02-01"
+@factory = "bigmodel"
+
+[modelA.submodel]
+@factory = "submodel"
+value = 12.0
+
+[modelB]
+date = "2003-04-05"
+@factory = "bigmodel"
+submodel = ${modelA.submodel}
+
+"""
+    )
+
+
+def test_inline_serialization():
+    config = Config(
+        {
+            "section": {
+                "a": [
+                    "ok",
+                    1.0,
+                    30,
+                    float("inf"),
+                    -float("inf"),
+                    float("nan"),
+                    None,
+                    True,
+                    False,
+                ],
+                "b": ("ok", {"x": Reference("other.a")}),
+            },
+            "other": {"a": "a", "b": "b"},
+        }
+    )
+    assert (
+        config.resolve().to_str()
+        == """\
+[section]
+a = ["ok", 1.0, 30, Infinity, -Infinity, NaN, null, true, false]
+b = ("ok", {"x": "a"})
+
+[other]
+a = "a"
+b = "b"
+
+"""
+    )
+
+
+def test_xjson():
+    obj = {
+        "a": ["ok", 1.0, 30, float("inf"), -float("inf"), None, True, False],
+        "b": ("ok", {"x": Reference("other.a")}),
+    }
+    print(dumps(obj))
+    assert loads(dumps(obj)) == obj
+
+
+def test_xjson_fail():
+    obj = {
+        "a": CustomClass(),
+    }
+    with pytest.raises(TypeError):
+        dumps(obj)
 
 
 def test_cast_parameters():
@@ -158,7 +238,7 @@ a = 1
     assert params == {"sum": 11}
 
 
-def test_ilegal_interpolation():
+def test_illegal_interpolation():
     config = """\
 [script]
 modelA = ${modelA}

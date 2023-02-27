@@ -131,9 +131,9 @@ def validate_arguments(
 
             _func.vd = vd  # type: ignore
             _func.__get_validators__ = __get_validators__  # type: ignore
-            _func.__init__.raw_function = vd.raw_function  # type: ignore
             _func.model = vd.model  # type: ignore
             _func.__init__ = wrapper_function
+            _func.__init__.raw_function = vd.raw_function  # type: ignore
             return _func
 
         else:

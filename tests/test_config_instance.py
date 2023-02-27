@@ -455,6 +455,7 @@ submodel = ${modelA}
 
 
 @registry.factory.register("inherited-model")
+@registry.factory.register("inherited-model-alias")
 class InheritedModel(BigModel):
     def __init__(self, date: datetime.date, submodel: SubModel, special: int = 3, **kw):
         super().__init__(date, submodel)

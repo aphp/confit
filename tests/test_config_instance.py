@@ -452,3 +452,31 @@ submodel = ${modelA}
     with pytest.raises(CyclicReferenceError) as exc_info:
         config.resolve(registry=registry)
     assert str(exc_info.value) == "Cyclic reference detected at modelA"
+
+
+@registry.factory.register("inherited-model")
+@registry.factory.register("inherited-model-alias")
+class InheritedModel(BigModel):
+    def __init__(self, date: datetime.date, submodel: SubModel, special: int = 3, **kw):
+        super().__init__(date, submodel)
+        self.special = special
+        self.kw = kw
+
+
+def test_inheritance():
+    cfg = """\
+[modelA]
+@factory = "inherited-model"
+date = "2003-02-01"
+special = 5
+extra = 'extra'
+
+
+[modelA.submodel]
+@factory = "submodel"
+value = 12.0
+
+"""
+    model = Config.from_str(cfg).resolve(registry=registry)["modelA"]
+    assert model.special == 5
+    assert model.kw == {"extra": "extra"}

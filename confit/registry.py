@@ -74,10 +74,11 @@ def validate_arguments(
     config = {**config, "arbitrary_types_allowed": True}
 
     def validate(_func: Callable) -> Callable:
-
         if isinstance(_func, type):
-            if hasattr(_func, "raw_function"):
-                vd = pydantic.decorator.ValidatedFunction(_func.raw_function, config)
+            if hasattr(_func.__init__, "raw_function"):
+                vd = pydantic.decorator.ValidatedFunction(
+                    _func.__init__.raw_function, config
+                )
             else:
                 vd = pydantic.decorator.ValidatedFunction(_func.__init__, config)
             vd.model.__name__ = _func.__name__
@@ -130,9 +131,9 @@ def validate_arguments(
 
             _func.vd = vd  # type: ignore
             _func.__get_validators__ = __get_validators__  # type: ignore
-            _func.raw_function = vd.raw_function  # type: ignore
             _func.model = vd.model  # type: ignore
             _func.__init__ = wrapper_function
+            _func.__init__.raw_function = vd.raw_function  # type: ignore
             return _func
 
         else:

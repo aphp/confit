@@ -1,10 +1,10 @@
-# Configuration system
+# Confit
 
 Confit is a complete and easy-to-use configuration framework aimed at improving the reproducibility
 of experiments by relying on the Python typing system, minimal configuration files and
 command line interfaces.
 
-## Backbone
+## Architecture
 
 The three pillars of this configuration system are the [catalogue](https://github.com/explosion/catalogue) registry,
 the [Pydantic](https://github.com/pydantic/pydantic) validation system and the [typer](https://github.com/tiangolo/typer) CLI library.
@@ -18,22 +18,19 @@ used in the configuration system.
 To start, you can create a simple registry with a single `"factory"` key as follows:
 
 ```python
-from confit import Cli, Registry, get_default_registry, set_default_registry
+from confit import Registry, set_default_registry
 
 
 @set_default_registry
-class RegistryCollection:
+class registry:
     factory = Registry(("my_registry", "factory"), entry_points=True)
 
     _catalogue = dict(
         factory=factory,
     )
-
-
-registry = get_default_registry()
 ```
 
-!!! tip "Any now what ?"
+!!! tip "And now what ?"
     With this registry, you can *register* a function or a class:
     ```python
     @registry.factory.register("my-function")
@@ -72,24 +69,25 @@ A cfg file can be used directly as an input to a CLI-decorated function.
 
 We will show partial examples with increasing complexity below. See [here][a-simple-example] for an end-to-end example.
 
-### Instantiating a object
+### Instantiating an object
 
 ```python title="script.py"
-@registry.factory.register("myClass")
-def MyClass():
+@registry.factory.register("my-class")
+class MyClass:
     def __init__(self, value1: int, value2: float):
         self.value1 = value1
         self.value2 = value2
 ```
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [myclass]
-@factory = "myClass"
+@factory = "my-class"
 value1 = 1.1
 value2 = 2.5
 ```
 
 Here, **Confit** will:
+
 - Parse the configuration
 - Get the target class from the registry
 - Validate parameters if needed (in this case, `value1` is typed as an int, thus it will be casted as an int by setting `value1=1`)
@@ -99,9 +97,9 @@ Here, **Confit** will:
 
 When multiple sections of the configuration need to access the same value, you can provide it using the `${<section.value>}` syntax:
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [myclass]
-@factory = "myClass"
+@factory = "my-class"
 value1 = 1.1
 value2 = ${other_values.value3}
 
@@ -115,13 +113,13 @@ Here, `value2` will be set to 10.
 
 You can even pass instantiated objects! Suppose we have a registered `myOtherClass` class expecting an instance of `MyClass` as input. You could use the following configuration:
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [func]
-@factory = "myOtherClass"
+@factory = "my-other-class"
 obj = ${myclass}
 
 [myclass]
-@factory = "myClass"
+@factory = "my-class"
 value1 = 1.1
 value2 = ${other_values.value3}
 
@@ -133,8 +131,8 @@ Finally, you may want to access some attributes of Python classes that are avail
 
 
 ```diff title="script.py"
-@registry.factory.register("myClass")
-def MyClass():
+@registry.factory.register("my-class")
+class MyClass:
     def __init__(self, value1: int, value2: float):
         self.value1 = value1
         self.value2 = value2
@@ -144,9 +142,9 @@ def MyClass():
 To access those values directly in the configuration file, use the ${<obj:attribute>} syntax (notice the **colon** instead of the **point** mentionned [here][interpolating-values])
 
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [myclass]
-@factory = "myClass"
+@factory = "my-class"
 value1 = 1.1
 value2 = 2.5
 

@@ -4,7 +4,8 @@ import pytest
 from pydantic import ValidationError, validate_arguments
 
 from confit import Config, Registry
-from confit.config import MissingReference, Reference
+from confit.config import CyclicReferenceError, MissingReference, Reference
+from confit.utils.xjson import dumps, loads
 
 
 class RegistryCollection:
@@ -61,7 +62,7 @@ date = "2003-02-01"
 
 [modelA.submodel]
 @factory = "submodel"
-value = 12
+value = 12.0
 
 [modelB]
 date = "2003-04-05"
@@ -108,6 +109,89 @@ def test_write_to_str():
 
     exported = reexport(pipeline_config)
     assert reexport(exported) == exported
+
+
+def test_write_resolved_to_str():
+    s = Config().from_str(pipeline_config, resolve=True, registry=registry)
+    assert s["modelA"] is s["script"]["modelA"]
+    assert (
+        s.to_str()
+        == """\
+[script]
+modelA = ${modelA}
+modelB = ${modelB}
+hidden_value = 10
+
+[modelA]
+date = "2003-02-01"
+@factory = "bigmodel"
+
+[modelA.submodel]
+@factory = "submodel"
+value = 12.0
+
+[modelB]
+date = "2003-04-05"
+@factory = "bigmodel"
+submodel = ${modelA.submodel}
+
+"""
+    )
+
+
+def test_inline_serialization():
+    config = Config(
+        {
+            "section": {
+                "a": [
+                    "ok",
+                    1.0,
+                    30,
+                    float("inf"),
+                    -float("inf"),
+                    float("nan"),
+                    None,
+                    True,
+                    False,
+                ],
+                "b": ("ok", {"x": Reference("other.a")}),
+            },
+            "other": {"a": "a", "b": "b"},
+        }
+    )
+    assert (
+        config.resolve().to_str()
+        == """\
+[section]
+a = ["ok", 1.0, 30, Infinity, -Infinity, NaN, null, true, false]
+b = ("ok", {"x": "a"})
+
+[other]
+a = "a"
+b = "b"
+
+"""
+    )
+
+
+def test_xjson():
+    obj = {
+        "a": ["ok", 1.0, 30, float("inf"), -float("inf"), None, True, False],
+        "b": ("ok", {"x": Reference("other.a")}),
+    }
+    print(dumps(obj))
+    assert loads(dumps(obj)) == obj
+    assert dumps(float("nan")) == "NaN"
+    nan = loads("NaN")
+    assert nan != nan
+
+
+def test_xjson_fail():
+    obj = {
+        "a": CustomClass(),
+    }
+    with pytest.raises(TypeError):
+        dumps(obj)
 
 
 def test_cast_parameters():
@@ -158,11 +242,41 @@ a = 1
     assert params == {"sum": 11}
 
 
-def test_ilegal_interpolation():
+def test_strings():
+    config = """
+[params]
+foo = "foo"
+bar = 'bar'
+val = val
+quoted = "'val'"
+esc = "\\"val\\""
+"""
+    cfg = Config.from_str(config).resolve()
+    assert cfg["params"] == {
+        "foo": "foo",
+        "bar": "bar",
+        "val": "val",
+        "quoted": "'val'",
+        "esc": '"val"',
+    }
+    assert (
+        cfg.to_str()
+        == """\
+[params]
+foo = "foo"
+bar = "bar"
+val = "val"
+quoted = "'val'"
+esc = "\\"val\\""
+
+"""
+    )
+
+
+def test_illegal_interpolation():
     config = """\
 [script]
 modelA = ${modelA}
-modelB = ${modelB}
 hidden_value = ${modelA:get_hidden_value()}
 
 [modelA]
@@ -219,7 +333,7 @@ def test_missing_error():
         ).resolve(registry=registry)
     assert (
         str(exc_info.value)
-        == "Could not interpolate the following references: ${missing}"
+        == "Could not interpolate the following reference: ${missing}"
     )
 
 
@@ -319,3 +433,22 @@ size = 128
     assert merged["modelA"]["date"] == "2006-06-06"
     assert "extra" not in resolved["script"]
     assert "other_extra" in resolved["script"]
+
+
+def test_cyclic_reference():
+    config = """\
+[modelA]
+date = "2003-02-01"
+@factory = "bigmodel"
+submodel = ${modelB}
+
+[modelB]
+date = "2010-02-01"
+@factory = "bigmodel"
+submodel = ${modelA}
+
+"""
+    config = Config().from_str(config)
+    with pytest.raises(CyclicReferenceError) as exc_info:
+        config.resolve(registry=registry)
+    assert str(exc_info.value) == "Cyclic reference detected at modelA"

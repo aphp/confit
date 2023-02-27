@@ -4,17 +4,56 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pydantic import ValidationError
-from typer import Context, Typer
+from typer import Context, Typer, colors, secho
 from typer.core import TyperCommand
 from typer.models import CommandFunctionType, Default
 
-from .config import Config, merge_from_disk, parse_overrides, validate_arguments
+from .config import Config, merge_from_disk
+from .registry import validate_arguments
 from .utils.random import set_seed
+from .utils.xjson import loads
+
+
+def parse_overrides(args: List[str]) -> Dict[str, Any]:
+    """
+    Parse the overrides from the command line into a dictionary
+    of key-value pairs.
+
+    Parameters
+    ----------
+    args: List[str]
+        The arguments to parse
+
+    Returns
+    -------
+    Dict[str, Any]
+        The parsed overrides as a dictionary
+    """
+    result = {}
+    while args:
+        opt = args.pop(0)
+        err = f"Invalid config override '{opt}'"
+        if opt.startswith("--"):  # new argument
+            opt = opt.replace("--", "")
+            if "=" in opt:  # we have --opt=value
+                opt, value = opt.split("=", 1)
+            else:
+                if not args or args[0].startswith("--"):  # flag with no value
+                    value = "true"
+                else:
+                    value = args.pop(0)
+            opt = opt.replace("-", "_")
+            result[opt] = loads(value)
+        else:
+            secho(f"{err}: doesn't support shorthands", fg=colors.RED)
+            exit(1)
+    return result
 
 
 class Cli(Typer):
     """
     Custom Typer object that:
+
     - validates a command parameters before executing it
     - accepts a configuration file describing the parameters
     - automatically instantiates parameters given a dictionary when type hinted
@@ -63,15 +102,9 @@ class Cli(Typer):
             def command(ctx: Context, config: Optional[List[Path]] = None):
                 config_path = config
 
-                has_meta = fn_has_meta(fn)
+                has_meta = _fn_has_meta(fn)
                 if config_path:
                     config, name_from_file = merge_from_disk(config_path)
-
-                    if ("name" in inspect.signature(fn).parameters) and (
-                        config.get(name, {}).get("name", False) is None
-                    ):
-                        # We use the config file name
-                        config[name]["name"] = name_from_file
                 else:
                     config = Config({name: {}})
                 for k, v in parse_overrides(ctx.args).items():
@@ -120,5 +153,5 @@ class Cli(Typer):
         return wrapper
 
 
-def fn_has_meta(fn):
+def _fn_has_meta(fn):
     return "config_meta" in inspect.signature(fn).parameters

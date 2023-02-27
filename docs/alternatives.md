@@ -1,7 +1,0 @@
-# Alternatives & Comparison
-
-## Confection
-
-## Gin
-
-## ...

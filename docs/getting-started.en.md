@@ -19,9 +19,8 @@ leaves the rest of your code unchanged.
 
 Here is an example:
 
-<h5 a><strong><code>script.py</code></strong></h5>
 
-```diff
+```diff title="script.py"
 import datetime
 + from confit import Cli, Registry, get_default_registry, set_default_registry
 
@@ -65,9 +64,7 @@ def func(modelA: BigModel, modelB: BigModel, other: int, seed: int):
 
 Create a new config file
 
-<h5 a><strong><code>config.cfg</code></strong></h5>
-
-```cfg
+```ini title="config.cfg"
 # CLI sections
 [script]
 modelA = ${modelA}

@@ -2,7 +2,7 @@ import datetime
 
 from typer.testing import CliRunner
 
-from confit import Cli, Registry
+from confit import Cli, Config, Registry
 from confit.registry import set_default_registry
 
 runner = CliRunner()
@@ -58,8 +58,7 @@ def test_cli_working(change_test_dir):
             "2010-10-10",
             "--other",
             "4",
-            "--seed",
-            "42",
+            "--seed=42",
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -118,6 +117,7 @@ def function(
 
 
 def test_cli_working_with_meta(change_test_dir):
+
     result = runner.invoke(
         app_with_meta,
         [
@@ -133,3 +133,52 @@ def test_cli_working_with_meta(change_test_dir):
     )
     assert result.exit_code == 0, result.stdout
     assert "Other: 4" in result.stdout
+
+
+def test_fail_cli_shorthands(change_test_dir):
+    result = runner.invoke(
+        app,
+        [
+            "--modelA.date",
+            "2010-10-10",
+            "--other",
+            "4",
+            "-seed",
+            "42",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "shorthand" in result.stdout
+
+
+bool_app = Cli(pretty_exceptions_show_locals=False)
+
+
+@bool_app.command(name="script")
+def function(bool_value: bool, str_value: str):
+    print("BOOL:", bool_value)
+    print("STR:", str_value)
+
+
+def test_cli_bool(change_test_dir):
+    result = runner.invoke(
+        bool_app,
+        [
+            "--bool_value",
+            "--str_value",
+        ],
+    )
+    assert result.exit_code == 0
+    # CLI detects bool param for other which is converted to 1 since we expect an int
+    assert "BOOL: True" in result.stdout
+    assert "STR: True" in result.stdout
+
+
+def test_fail_override(change_test_dir):
+    result = runner.invoke(
+        bool_app,
+        ["--section.int_value", "3"],
+    )
+    assert result.exit_code == 1
+    # CLI detects bool param for other which is converted to 1 since we expect an int
+    assert "does not match any existing section in config" in str(result.exception)

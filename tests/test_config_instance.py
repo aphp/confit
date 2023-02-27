@@ -181,6 +181,9 @@ def test_xjson():
     }
     print(dumps(obj))
     assert loads(dumps(obj)) == obj
+    assert dumps(float("nan")) == "NaN"
+    nan = loads("NaN")
+    assert nan != nan
 
 
 def test_xjson_fail():
@@ -237,6 +240,37 @@ a = 1
 """
     params = Config.from_str(config).resolve()["params"]
     assert params == {"sum": 11}
+
+
+def test_strings():
+    config = """
+[params]
+foo = "foo"
+bar = 'bar'
+val = val
+quoted = "'val'"
+esc = "\\"val\\""
+"""
+    cfg = Config.from_str(config).resolve()
+    assert cfg["params"] == {
+        "foo": "foo",
+        "bar": "bar",
+        "val": "val",
+        "quoted": "'val'",
+        "esc": '"val"',
+    }
+    assert (
+        cfg.to_str()
+        == """\
+[params]
+foo = "foo"
+bar = "bar"
+val = "val"
+quoted = "'val'"
+esc = "\\"val\\""
+
+"""
+    )
 
 
 def test_illegal_interpolation():

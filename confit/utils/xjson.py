@@ -1,3 +1,4 @@
+import ast
 from json.encoder import py_encode_basestring_ascii
 from typing import Any, Callable
 
@@ -17,7 +18,8 @@ xjson_grammar = r"""
           | list
           | tuple
           | string
-          | SIGNED_NUMBER      -> number
+          | SIGNED_FLOAT       -> float
+          | SIGNED_INT         -> int
           | "Infinity"         -> plus_inf
           | "-Infinity"        -> minus_inf
           | "NaN"              -> nan
@@ -36,18 +38,24 @@ xjson_grammar = r"""
     dict : "{" [pair ("," pair)*] "}"
     pair : string ":" value
 
-    string : ESCAPED_STRING
+    string : STRING
     reference : "${" reference_content "}"
     !reference_content : NON_BRACES ? ( "{" reference_content "}" ? ) *
     NON_BRACES : /[^{}]+/
 
+    // https://github.com/lark-parser/lark/blob/master/lark/grammars/python.lark#L284
+    STRING : /([ubf]?r?|r[ubf])("(?!"").*?(?<!\\)(\\\\)*?"|'(?!'').*?(?<!\\)(\\\\)*?')/i
     VARNAME : ("_"|"-"|LETTER) ("_"|"-"|LETTER|DIGIT)*
     COMMENT: /#[^\n]*/
+
+    SIGNED_FLOAT: ["+"|"-"] FLOAT
+    SIGNED_INT: ["+"|"-"] INT
 
     %import common.ESCAPED_STRING
     %import common.LETTER
     %import common.DIGIT
-    %import common.SIGNED_NUMBER
+    %import common.FLOAT
+    %import common.INT
     %import common.WS
     %ignore WS
     %ignore COMMENT
@@ -66,12 +74,18 @@ class XJsonTransformer(Transformer):
     def string(self, s):
         """Parse string"""
         (s,) = s
-        return s[1:-1]
+        s = ast.literal_eval(s)
+        return s
 
-    def number(self, n):
+    def float(self, n):
         """Parse number"""
         (n,) = n
         return float(n)
+
+    def int(self, n):
+        """Parse number"""
+        (n,) = n
+        return int(n)
 
     def reference(self, tree: Tree):
         """Parse reference"""
@@ -105,7 +119,7 @@ class XJsonTransformer(Transformer):
 
     def nan(self, _):
         """Parse nan"""
-        return -float("nan")
+        return float("nan")
 
 
 _json_parser = Lark(

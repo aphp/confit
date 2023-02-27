@@ -287,13 +287,11 @@ class Config(dict):
                     )
                     else 0,
                 )
-                print(" >" * len(path), "UNSOLVING", [k for k, v in items])
                 serialized = {k: rec(v, (*path, k)) for k, v in items}
                 serialized = {k: serialized[k] for k in o.keys()}
                 if isinstance(o, Config):
                     serialized = Config(serialized)
                     serialized.__path__ = o.__path__
-                print(" >" * len(path), str(serialized))
                 return serialized
             if isinstance(o, (list, tuple)):
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
@@ -432,7 +430,6 @@ class Config(dict):
 
                     except ValidationError as e:
                         raise ValidationError(patch_errors(e.raw_errors, loc), e.model)
-                print("Resolved", loc, obj, "=>", resolved)
             elif isinstance(obj, list):
                 resolved = [rec(v, (*loc, i)) for i, v in enumerate(obj)]
             elif isinstance(obj, tuple):

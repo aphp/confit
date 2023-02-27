@@ -53,6 +53,7 @@ def parse_overrides(args: List[str]) -> Dict[str, Any]:
 class Cli(Typer):
     """
     Custom Typer object that:
+
     - validates a command parameters before executing it
     - accepts a configuration file describing the parameters
     - automatically instantiates parameters given a dictionary when type hinted

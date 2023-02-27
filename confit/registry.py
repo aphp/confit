@@ -211,7 +211,7 @@ def get_default_registry() -> Registry:
 def set_default_registry(registry: Registry) -> Registry:
     """
     Set the default registered registry. This is used in
-    [`Config.resolve()`][edspdf.config.Config.resolve] when no registry is provided.
+    [`Config.resolve()`][confit.config.Config.resolve] when no registry is provided.
 
     Parameters
     ----------

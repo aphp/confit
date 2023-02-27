@@ -330,11 +330,11 @@ function createTermynals() {
                     if (isBlankSpace) {
                         dataValue["delay"] = 0;
                     }
-                    if (buffer[buffer.length - 1] === "") {
+                    /*if (buffer[buffer.length - 1] === "") {
                         // A last single <br> won't have effect
                         // so put an additional one
                         buffer.push("");
-                    }
+                    }*/
 
                     const bufferValue = buffer.join("<br>");
                     dataValue["value"] = bufferValue;

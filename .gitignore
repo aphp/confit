@@ -35,6 +35,12 @@ var/
 .installed.cfg
 *.egg
 
+# Docs
+docs/changelog.md
+docs/contributing.md
+docs/roadmap.md
+docs/reference
+
 # Unit test / coverage reports
 htmlcov/
 .tox/

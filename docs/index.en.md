@@ -33,7 +33,7 @@ class RegistryCollection:
 registry = get_default_registry()
 ```
 
-!!! tip "Any now what ?"
+!!! tip "And now what ?"
     With this registry, you can *register* a function or a class:
     ```python
     @registry.factory.register("my-function")
@@ -90,6 +90,7 @@ value2 = 2.5
 ```
 
 Here, **Confit** will:
+
 - Parse the configuration
 - Get the target class from the registry
 - Validate parameters if needed (in this case, `value1` is typed as an int, thus it will be casted as an int by setting `value1=1`)

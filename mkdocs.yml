@@ -4,6 +4,7 @@ repo_url: https://gitlab.eds.aphp.fr/datasciencetools/confit
 # repo_name: algorithms/pseudonymisation
 
 theme:
+  language: en
   name: material
   palette:
     - scheme: default
@@ -23,9 +24,9 @@ theme:
     - content.code.annotate
 
 nav:
-  - index.md
+  - getting-started.en.md
+  - index.en.md
   - alternatives.md
-  - getting-started.md
   - Code Reference: reference/
   - contributing.md
   - changelog.md
@@ -45,28 +46,32 @@ watch:
   - contributing.md
   - roadmap.md
   - changelog.md
+  - confit
 
 extra:
+  alternate:
+    - name: English
+      link: /en/
+      lang: en
+    - name: Français
+      link: /fr/
+      lang: fr
   version:
     provider: mike
+
+hooks:
+    - docs/scripts/plugin.py
 
 plugins:
   - search
   - bibtex:
       bib_file: "docs/references.bib"
-  - gen-files:
-      scripts:
-        - docs/scripts/generate_reference.py
-        - docs/scripts/generate_development.py
-  - literate-nav:
-      nav_file: SUMMARY.md
   - autorefs
   - mkdocstrings:
       handlers:
         python:
-          selection:
+          options:
             docstring_style: numpy
-          rendering:
             docstring_section_style: spacy
             heading_level: 2
             members_order: source
@@ -79,6 +84,21 @@ plugins:
       height: auto
       zoomable: true
       draggable: true
+  - i18n:
+      default_language: en
+      docs_structure: suffix
+      languages:
+        en:
+          name: English
+          build: true
+        fr:
+          name: Français
+          build: true
+      nav_translations:
+        fr:
+          Alternatives & Comparison: Alternatives & Comparaisons
+          Configuration system: Système de configuration
+          Getting started: Mise en route
   - mike
 
 markdown_extensions:

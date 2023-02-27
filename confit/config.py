@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from pydantic.error_wrappers import ErrorWrapper
 from pydantic.schema import encode_default
 
-from confit.utils.collections import dedup, flatten_sections, join_path, split_path
+from confit.utils.collections import flatten_sections, join_path, split_path
 from confit.utils.eval import safe_eval
 from confit.utils.xjson import Reference, dumps, loads
 
@@ -53,23 +53,43 @@ class MissingReference(Exception):
     Raised when one or multiple references cannot be resolved.
     """
 
-    def __init__(self, references: List[Reference]):
+    def __init__(self, ref: Reference):
         """
         Parameters
         ----------
-        references: List[Reference]
-            The references that could not be resolved.
+        ref: Reference
+            The reference that could not be resolved.
         """
-        self.references = references
+        self.ref = ref
         super().__init__()
 
     def __str__(self):
         """
         String representation of the exception
         """
-        return "Could not interpolate the following references: {}".format(
-            ", ".join("${{{}}}".format(r) for r in self.references)
-        )
+        return "Could not interpolate the following reference: ${{{}}}".format(self.ref)
+
+
+class CyclicReferenceError(Exception):
+    """
+    Raised when a cyclic reference is detected.
+    """
+
+    def __init__(self, path: Loc):
+        """
+        Parameters
+        ----------
+        path: Loc
+            The path of the cyclic reference
+        """
+        self.path = path
+        super().__init__()
+
+    def __str__(self):
+        """
+        String representation of the exception
+        """
+        return "Cyclic reference detected at {}".format(join_path(self.path))
 
 
 def resolve_reference(ref: Reference, leaves: Dict[Loc, Any]) -> Any:
@@ -94,6 +114,7 @@ def resolve_reference(ref: Reference, leaves: Dict[Loc, Any]) -> Any:
     -------
     Any
     """
+
     pat = re.compile(
         r"\b((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)" r"(?::((?:[^\W0-9]\w*\.)*[^\W0-9]\w*))?",
     )
@@ -266,12 +287,13 @@ class Config(dict):
                     )
                     else 0,
                 )
-                print("ITEMS", items)
+                print(" >" * len(path), "UNSOLVING", [k for k, v in items])
                 serialized = {k: rec(v, (*path, k)) for k, v in items}
                 serialized = {k: serialized[k] for k in o.keys()}
                 if isinstance(o, Config):
                     serialized = Config(serialized)
                     serialized.__path__ = o.__path__
+                print(" >" * len(path), str(serialized))
                 return serialized
             if isinstance(o, (list, tuple)):
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
@@ -353,97 +375,93 @@ class Config(dict):
             from .registry import get_default_registry
 
             registry = get_default_registry()
-        leaves = {}
+        resolved_locs = {}
+        seen_locs = set()
 
-        def rec(obj, _path=()):
+        def rec(obj, loc=()):
             """
             Parameters
             ----------
             obj: Any
                 The current object being resolved
-            _path: Sequence[str]
+            loc: Sequence[str]
                 Internal variable
                 Current path in tree
-
 
             Returns
             -------
 
             """
-            if not deep and len(_path) > 1:
+            if loc in resolved_locs:
+                return resolved_locs[loc]
+
+            if loc in seen_locs:
+                raise CyclicReferenceError(loc)
+
+            seen_locs.add(loc)
+
+            if not deep and len(loc) > 1:
                 return obj
+
             if isinstance(obj, Mapping):
-                copy = Config(obj)
-                unresolved_items = [(k, v) for k, v in obj.items()]
-            elif isinstance(obj, (list, tuple)):
-                copy = list(obj)
-                unresolved_items = list(enumerate(obj))
-            else:
-                return obj
+                resolved = Config({k: rec(v, (*loc, k)) for k, v in obj.items()})
 
-            last_count = len(leaves)
+                registries = [
+                    (key, value, registry._catalogue[key[1:]])
+                    for key, value in resolved.items()
+                    if key.startswith("@")
+                ]
+                assert len(registries) <= 1, (
+                    f"Cannot resolve using multiple " f"registries at {'.'.join(loc)}"
+                )
 
-            while len(unresolved_items):
-                traced_missing_values = []
-                missing = []
-                for key, value in unresolved_items:
+                if len(registries) == 1:
+                    copy = resolved
+                    params = dict(resolved)
+                    params.pop(registries[0][0])
+                    fn = registries[0][2].get(registries[0][1])
                     try:
-                        if isinstance(value, Reference):
-                            try:
-                                leaves[(*_path, key)] = resolve_reference(value, leaves)
-                            except (KeyError, NameError):
-                                raise MissingReference([value])
-                            else:
-                                copy[key] = leaves[(*_path, key)]
-                        else:
-                            leaves[(*_path, key)] = rec(value, (*_path, key))
-                            copy[key] = leaves[(*_path, key)]
-                    except MissingReference as e:
-                        traced_missing_values.extend(e.references)
-                        missing.append((key, value))
-                # If we found a missing reference and the number of
-                # resolved leaves since the last iteration of the unresolved items
-                # is the same, then we need to resolve other parts of the tree
-                if len(missing) > 0 and len(leaves) == last_count:
-                    raise MissingReference(dedup(traced_missing_values))
-
-                unresolved_items = missing
-                last_count = len(leaves)
-
-            # If simple sequence, don't try to resolve it using a registry
-            if isinstance(obj, list):
-                return copy
-            if isinstance(obj, tuple):
-                return tuple(copy)
-
-            registries = [
-                (key, value, registry._catalogue[key[1:]])
-                for key, value in copy.items()
-                if key.startswith("@")
-            ]
-            assert len(registries) <= 1, (
-                f"Cannot resolve using multiple " f"registries at {'.'.join(_path)}"
-            )
-
-            if len(registries) == 1:
-                params = dict(copy)
-                params.pop(registries[0][0])
-                fn = registries[0][2].get(registries[0][1])
-                try:
-                    resolved = fn(**params)
-                    try:
-                        resolved.cfg
-                    except Exception:
+                        resolved = fn(**params)
                         try:
-                            RESOLVED_TO_CONFIG[resolved] = copy
+                            resolved.cfg
                         except Exception:
-                            pass
+                            try:
+                                RESOLVED_TO_CONFIG[resolved] = copy
+                            except Exception:
+                                pass
+
+                    except ValidationError as e:
+                        raise ValidationError(patch_errors(e.raw_errors, loc), e.model)
+                print("Resolved", loc, obj, "=>", resolved)
+            elif isinstance(obj, list):
+                resolved = [rec(v, (*loc, i)) for i, v in enumerate(obj)]
+            elif isinstance(obj, tuple):
+                resolved = tuple(rec(v, (*loc, i)) for i, v in enumerate(obj))
+            elif isinstance(obj, Reference):
+                try:
+                    resolved = resolve_reference(obj, resolved_locs)
+                except KeyError as e:
+                    ref_path = e.args[0]
+                    loc = split_path(ref_path)
+
+                    try:
+                        current = self
+                        for part in loc:
+                            current = current[part]
+                    except KeyError:
+                        raise MissingReference(obj)
+
+                    rec(current, loc)
+
+                    resolved = resolve_reference(obj, resolved_locs)
 
                     return resolved
-                except ValidationError as e:
-                    raise ValidationError(patch_errors(e.raw_errors, _path), e.model)
+            else:
+                resolved = obj
 
-            return copy
+            resolved_locs[loc] = resolved
+
+            return resolved
 
         return rec(self, ())
 

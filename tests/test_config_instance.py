@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError, validate_arguments
 
 from confit import Config, Registry
-from confit.config import MissingReference, Reference
+from confit.config import CyclicReferenceError, MissingReference, Reference
 from confit.utils.xjson import dumps, loads
 
 
@@ -113,6 +113,7 @@ def test_write_to_str():
 
 def test_write_resolved_to_str():
     s = Config().from_str(pipeline_config, resolve=True, registry=registry)
+    assert s["modelA"] is s["script"]["modelA"]
     assert (
         s.to_str()
         == """\
@@ -242,7 +243,6 @@ def test_illegal_interpolation():
     config = """\
 [script]
 modelA = ${modelA}
-modelB = ${modelB}
 hidden_value = ${modelA:get_hidden_value()}
 
 [modelA]
@@ -299,7 +299,7 @@ def test_missing_error():
         ).resolve(registry=registry)
     assert (
         str(exc_info.value)
-        == "Could not interpolate the following references: ${missing}"
+        == "Could not interpolate the following reference: ${missing}"
     )
 
 
@@ -399,3 +399,22 @@ size = 128
     assert merged["modelA"]["date"] == "2006-06-06"
     assert "extra" not in resolved["script"]
     assert "other_extra" in resolved["script"]
+
+
+def test_cyclic_reference():
+    config = """\
+[modelA]
+date = "2003-02-01"
+@factory = "bigmodel"
+submodel = ${modelB}
+
+[modelB]
+date = "2010-02-01"
+@factory = "bigmodel"
+submodel = ${modelA}
+
+"""
+    config = Config().from_str(config)
+    with pytest.raises(CyclicReferenceError) as exc_info:
+        config.resolve(registry=registry)
+    assert str(exc_info.value) == "Cyclic reference detected at modelA"

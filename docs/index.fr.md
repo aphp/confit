@@ -1,8 +1,8 @@
-# Système de configuration
+# Confit
 
 Confit est un système de configuration complet et facile d'utilisation qui vise à améliorer la reproductibilité des expériences en s'appuyant sur le système de typage Python, sur des fichiers de configuration minimaux et avec une interface en ligne de commande.
 
-## Backbone
+## Architecture
 
 Les trois piliers de ce système de configuration sont le registre [catalogue](https://github.com/explosion/catalogue),
 le système de validation [Pydantic](https://github.com/pydantic/pydantic) et la bibliothèque de CLI [typer](https://github.com/tiangolo/typer).
@@ -13,22 +13,19 @@ Le registre du catalogue enregistre les différents composants et couches qui pe
 Pour commencer, vous pouvez créer un registre simple avec une seule clé `"factory"` comme suit :
 
 ```python
-from confit import Registry, get_default_registry, set_default_registry
+from confit import Registry, set_default_registry
 
 
 @set_default_registry
-class RegistryCollection:
+class registry:
     factory = Registry(("my_registry", "factory"), entry_points=True)
 
     _catalogue = dict(
         factory=factory,
     )
-
-
-registre = get_default_registry()
 ```
 
-!!! tip "Et maintenant quoi ?"
+!!! tip "À quoi-cela sert-il ?"
     Avec ce registre, vous pouvez *ajouter au registre* soit une fonction ou une classe :
     ```python
     @registry.factory.register("ma-fonction")
@@ -56,7 +53,7 @@ Combiné avec notre système de configuration, les dictionnaires passés en tant
 
 ...
 
-### L'objet Config
+## L'objet Config
 
 L'objet configuration consiste en un dictionnaire superchargé, la classe `Config`, qui peut qui peut être utilisée pour lire et écrire dans les fichiers `cfg`, interpoler les variables et instancier les composants par le biais du registre avec certaines clés spéciales `@factory`. Un fichier cfg peut être utilisé directement comme entrée d'une fonction décorée par le CLI.
 
@@ -66,16 +63,16 @@ Nous allons exposer quelques exemples partiels de complexité croissante ci-dess
 
 ```python title="script.py"
 @registry.factory.register("ma-classe")
-def MaClasse() :
+class MaClasse:
     def __init__(self, valeur1 : int, valeur2 : float) :
-        self.value1 = value1
+        self.valeur1 = valeur1
         self.valeur2 = valeur2
 ```
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [objet]
 @factory = "ma-classe"
-valeur1 = 1.1
+valeur1 = 1.0
 valeur2 = 2.5
 ```
 
@@ -88,9 +85,9 @@ Ici, **Confit** va :
 
 ### Interpolation des valeurs
 
-Lorsque plusieurs sections de la configuration doivent accéder à la même valeur, vous pouvez la fournir en utilisant la syntaxe `${<section.value>}` :
+Lorsque plusieurs sections de la configuration doivent accéder à la même valeur, vous pouvez la fournir en utilisant la syntaxe `${<section.valeur>}` :
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [objet]
 @factory = "ma-classe"
 valeur1 = 1.1
@@ -106,7 +103,7 @@ Ici, `valeur2` sera fixé à 10.
 
 Vous pouvez même passer des objets instanciés ! Supposons que nous ayons une classe enregistrée `mon-autre-classe` qui attend une instance de `MaClasse` en entrée. Vous pourriez utiliser la configuration suivante :
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [func]
 @factory = "mon-autre-classe"
 obj = ${objet}
@@ -125,9 +122,9 @@ Enfin, vous pouvez vouloir accéder à certains attributs des classes Python qui
 
 ```diff title="script.py"
 @registry.factory.register("ma-classe")
-def MaClasse() :
+class MaClasse:
     def __init__(self, valeur1 : int, valeur2 : float) :
-        self.value1 = value1
+        self.valeur1 = valeur1
         self.valeur2 = valeur2
 +       self.valeur_cachée = 99
 ```
@@ -135,7 +132,7 @@ def MaClasse() :
 Pour accéder à ces valeurs directement dans le fichier de configuration, utilisez la syntaxe ${<obj:attribut>} (remarquez les **deux points** au lieu du **point** mentionné [ici][interpolation-dobjets])
 
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 [objet]
 @factory = "ma-classe
 valeur1 = 1.1

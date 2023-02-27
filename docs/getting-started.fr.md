@@ -63,7 +63,7 @@ def func(modelA : BigModel, modelB : BigModel, other : int, seed : int) :
 
 Créez un nouveau fichier de configuration
 
-```cfg title="config.cfg"
+```ini title="config.cfg"
 # Sections relative aux commandes disponibles via CLI
 [script]
 modelA = ${modelA}

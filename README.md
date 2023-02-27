@@ -66,7 +66,7 @@ Create a new config file
 
 <h5 a><strong><code>config.cfg</code></strong></h5>
 
-```cfg
+```ini
 # CLI sections
 [script]
 modelA = ${modelA}

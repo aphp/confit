@@ -3,14 +3,14 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import catalogue
 import pydantic
-from pydantic.decorator import (
-    ALT_V_ARGS,
-    ALT_V_KWARGS,
-    V_DUPLICATE_KWARGS,
-    V_POSITIONAL_ONLY_NAME,
-)
 
 from confit.config import Config
+
+
+class SignatureError(TypeError):
+    def __init__(self, func: Callable):
+        message = f"{func} must not have positional only args or duplicated kwargs"
+        super().__init__(message)
 
 
 def _resolve_and_validate_call(
@@ -25,26 +25,26 @@ def _resolve_and_validate_call(
     values = pydantic_func.build_values(args, kwargs)
     returned = pydantic_func.call(*args, **kwargs)
     if save_params is not None:
-        if set(values.keys()) & {
-            ALT_V_ARGS,
-            ALT_V_KWARGS,
-            V_POSITIONAL_ONLY_NAME,
-            V_DUPLICATE_KWARGS,
-            "args",
-            "kwargs",
-        }:
-            raise Exception(
-                f"{pydantic_func} must not have positional only args, "
-                f"kwargs or duplicated kwargs : call params are "
-                f"{values}"
-            )
         params = dict(values)
-        if use_self:
-            resolved = params.pop("self")
-        else:
-            resolved = returned
-        Config._store_resolved(resolved, {**save_params, **params})
+        params_kwargs = params.pop(pydantic_func.v_kwargs_name, {})
+        resolved = params.pop("self") if use_self else returned
+        Config._store_resolved(
+            resolved,
+            Config({**save_params, **params, **params_kwargs}),
+        )
     return returned
+
+
+def _check_signature_for_save_params(func: Callable):
+    """
+    Checks that a function does not expect positional only arguments
+    since these are not serializable using a nested dict data structure
+    """
+    import inspect
+
+    spec = inspect.getfullargspec(func)
+    if spec.varargs is not None:
+        raise SignatureError(func)
 
 
 def validate_arguments(
@@ -81,6 +81,8 @@ def validate_arguments(
                 )
             else:
                 vd = pydantic.decorator.ValidatedFunction(_func.__init__, config)
+            if save_params is not None:
+                _check_signature_for_save_params(vd.raw_function)
             vd.model.__name__ = _func.__name__
             vd.model.__fields__["self"].required = False
 
@@ -138,6 +140,8 @@ def validate_arguments(
 
         else:
             vd = pydantic.decorator.ValidatedFunction(_func, config)
+            if save_params is not None:
+                _check_signature_for_save_params(vd.raw_function)
 
             @wraps(_func)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:

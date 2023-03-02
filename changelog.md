@@ -1,5 +1,10 @@
 # Changelog
 
+# Pending
+
+- Verify the signature when registering rather than during a call
+- Allow `**kwargs`
+
 ## v0.1.4 - 27-02-2023
 
 - More robust resolution algorithm

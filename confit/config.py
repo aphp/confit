@@ -1,7 +1,6 @@
 import collections
 import re
 from configparser import ConfigParser
-from copy import deepcopy
 from io import StringIO
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence, Tuple, Union
@@ -483,17 +482,9 @@ class Config(dict):
         """
 
         def deep_set(current, path, val):
-            try:
-                path = split_path(path)
-                for part in path[:-1]:
-                    current = (
-                        current[part] if remove_extra else current.setdefault(part, {})
-                    )
-            except KeyError:
+            if path not in current and remove_extra:
                 return
-            if path[-1] not in current and remove_extra:
-                return
-            current[path[-1]] = val
+            current[path] = val
 
         def rec(old, new):
             for key, new_val in list(new.items()):
@@ -527,11 +518,34 @@ class Config(dict):
                     old[key] = new_val
             return old
 
-        config = deepcopy(self)
+        config = self.copy()
         for u in updates:
-            u = deepcopy(u)
+            u = u.copy()
             rec(config, u)
-        return Config(**config)
+        return config
+
+    def copy(self: Any) -> Any:
+        seen = {}
+
+        def rec(obj):
+            if id(obj) in seen:
+                return seen[id(obj)]
+            seen[id(obj)] = obj
+            if isinstance(obj, (Config, dict)):
+                return type(obj)(
+                    {k: rec(v) for k, v in obj.items()},
+                )
+            elif isinstance(obj, list):
+                return [rec(v) for v in obj]
+            elif isinstance(obj, tuple):
+                return tuple(rec(v) for v in obj)
+            elif isinstance(obj, Reference):
+                return Reference(obj.value, rec(obj.root))
+            else:
+                return obj
+
+        copy = rec(self)
+        return copy
 
     @classmethod
     def _store_resolved(cls, resolved: Any, config: "Config"):

@@ -161,15 +161,7 @@ class Config(dict):
         if len(args) == 1 and isinstance(args[0], dict):
             assert len(kwargs) == 0
             kwargs = args[0]
-        path: Loc = kwargs.pop("__path__", None)
-        kwargs = {
-            key: Config(value)
-            if isinstance(value, dict) and not isinstance(value, Config)
-            else value
-            for key, value in kwargs.items()
-        }
         super().__init__(**kwargs)
-        self.__path__: Loc = path
 
     @classmethod
     def from_str(cls, s: str, resolve: bool = False, registry: Any = None) -> Any:
@@ -276,13 +268,13 @@ class Config(dict):
         def rec(o: Any, path: Loc = ()):
             if is_simple(o):
                 return o
-            if isinstance(o, collections.Mapping):
+            if isinstance(o, collections.abc.Mapping):
                 items = sorted(
                     o.items(),
                     key=lambda x: 1
                     if (
                         is_simple(x[1])
-                        or isinstance(x[1], (collections.Mapping, list, tuple))
+                        or isinstance(x[1], (collections.abc.Mapping, list, tuple))
                     )
                     else 0,
                 )
@@ -290,7 +282,6 @@ class Config(dict):
                 serialized = {k: serialized[k] for k in o.keys()}
                 if isinstance(o, Config):
                     serialized = Config(serialized)
-                    serialized.__path__ = o.__path__
                 return serialized
             if isinstance(o, (list, tuple)):
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
@@ -325,22 +316,7 @@ class Config(dict):
         """
         additional_sections = {}
 
-        def rec(o, path=()):
-            if isinstance(o, collections.Mapping):
-                if isinstance(o, Config) and o.__path__ is not None:
-                    res = {k: rec(v, (*o.__path__, k)) for k, v in o.items()}
-                    current = additional_sections
-                    for part in o.__path__[:-1]:
-                        current = current.setdefault(part, Config())
-                    current[o.__path__[-1]] = res
-                    return Reference(join_path(o.__path__))
-                elif isinstance(o, (tuple, list)):
-                    return type(o)(rec(item) for item in o)
-                else:
-                    return {k: rec(v, (*path, k)) for k, v in o.items()}
-            return o
-
-        prepared = flatten_sections(rec(Config.serialize(self)))
+        prepared = flatten_sections(Config.serialize(self))
         prepared.update(flatten_sections(additional_sections))
 
         parser = ConfigParser()

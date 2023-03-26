@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
 import catalogue
 import pydantic
@@ -18,6 +18,7 @@ def _resolve_and_validate_call(
     kwargs: Dict[str, Any],
     pydantic_func: pydantic.decorator.ValidatedFunction,
     save_params: Optional[Dict],
+    skip_save_params: Sequence[str],
     use_self: bool,
 ):
     # args = Config.resolve(args)
@@ -28,9 +29,14 @@ def _resolve_and_validate_call(
         params = dict(values)
         params_kwargs = params.pop(pydantic_func.v_kwargs_name, {})
         resolved = params.pop("self") if use_self else returned
+
+        params_to_save = {**save_params, **params, **params_kwargs}
+        for name in skip_save_params:
+            params_to_save.pop(name, None)
+
         Config._store_resolved(
             resolved,
-            Config({**save_params, **params, **params_kwargs}),
+            Config(params_to_save),
         )
     return returned
 
@@ -42,8 +48,11 @@ def _check_signature_for_save_params(func: Callable):
     """
     import inspect
 
-    spec = inspect.getfullargspec(func)
-    if spec.varargs is not None:
+    spec = inspect.signature(func)
+    if any(
+        param.kind == inspect.Parameter.VAR_POSITIONAL
+        for param in spec.parameters.values()
+    ):
         raise SignatureError(func)
 
 
@@ -52,6 +61,7 @@ def validate_arguments(
     *,
     config: Dict = None,
     save_params: Optional[Dict] = None,
+    skip_save_params: Sequence[str] = (),
 ) -> Any:
     """
     Decorator to validate the arguments passed to a function.
@@ -64,6 +74,8 @@ def validate_arguments(
         The validation configuration object
     save_params: bool
         Should we save the function parameters
+    skip_save_params: Sequence[str]
+        List of parameters to skip when saving the function parameters
 
     Returns
     -------
@@ -86,6 +98,13 @@ def validate_arguments(
             vd.model.__name__ = _func.__name__
             vd.model.__fields__["self"].required = False
 
+            # Should we store the generator instead ?
+            existing_validators = (
+                list(_func.__get_validators__())
+                if hasattr(_func, "__get_validators__")
+                else []
+            )
+
             # This function is called by Pydantic when asked to cast
             # a value (most likely a dict) as a Model (most often during
             # a function call)
@@ -107,7 +126,10 @@ def validate_arguments(
                     if isinstance(value, dict):
                         value = Config(value).resolve()
 
-                    if not isinstance(value, dict):
+                    for validator in existing_validators:
+                        value = validator(value)
+
+                    if isinstance(value, _func):
                         return value
 
                     m = vd.init_model_instance(**value)
@@ -120,7 +142,10 @@ def validate_arguments(
                     resolved = _func(**d, **var_kwargs)
 
                     if save_params is not None:
-                        Config._store_resolved(resolved, {**save_params, **params})
+                        params_to_save = {**save_params, **params}
+                        for name in skip_save_params:
+                            params_to_save.pop(name, None)
+                        Config._store_resolved(resolved, params_to_save)
 
                     return resolved
 
@@ -129,7 +154,9 @@ def validate_arguments(
             # This function is called when we do Model(variable=..., other=...)
             @wraps(vd.raw_function)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                return _resolve_and_validate_call(args, kwargs, vd, save_params, True)
+                return _resolve_and_validate_call(
+                    args, kwargs, vd, save_params, skip_save_params, True
+                )
 
             _func.vd = vd  # type: ignore
             _func.__get_validators__ = __get_validators__  # type: ignore
@@ -145,7 +172,14 @@ def validate_arguments(
 
             @wraps(_func)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                return _resolve_and_validate_call(args, kwargs, vd, save_params, False)
+                return _resolve_and_validate_call(
+                    args,
+                    kwargs,
+                    vd,
+                    save_params,
+                    skip_save_params,
+                    False,
+                )
 
             wrapper_function.vd = vd  # type: ignore
             wrapper_function.validate = vd.init_model_instance  # type: ignore
@@ -165,7 +199,12 @@ class Registry(catalogue.Registry):
     """
 
     def register(
-        self, name: str, *, func: Optional[catalogue.InFunc] = None
+        self,
+        name: str,
+        *,
+        func: Optional[catalogue.InFunc] = None,
+        save_params=None,
+        **kwargs: Any,
     ) -> Callable[[catalogue.InFunc], catalogue.InFunc]:
         """
         This is a convenience wrapper around `catalogue.Registry.register`, that
@@ -177,7 +216,12 @@ class Registry(catalogue.Registry):
         Parameters
         ----------
         name: str
+            The name of the function
         func: Optional[catalogue.InFunc]
+            The function to register
+        save_params: Optional[Dict]
+            Additional parameters to save when the function is called. If falsy,
+            the function parameters are not saved.
 
         Returns
         -------
@@ -185,11 +229,14 @@ class Registry(catalogue.Registry):
         """
         registerer = super().register(name)
 
+        save_params = save_params or {f"@{self.namespace[-1]}": name}
+
         def wrap_and_register(fn: catalogue.InFunc) -> catalogue.InFunc:
             fn = validate_arguments(
                 fn,
                 config={"arbitrary_types_allowed": True},
-                save_params={f"@{self.namespace[-1]}": name},
+                save_params=save_params,
+                **kwargs,
             )
             return registerer(fn)
 

@@ -123,16 +123,16 @@ modelB = ${modelB}
 hidden_value = 10
 
 [modelA]
-date = "2003-02-01"
 @factory = "bigmodel"
+date = "2003-02-01"
 
 [modelA.submodel]
 @factory = "submodel"
 value = 12.0
 
 [modelB]
-date = "2003-04-05"
 @factory = "bigmodel"
+date = "2003-04-05"
 submodel = ${modelA.submodel}
 
 """
@@ -374,13 +374,12 @@ def test_factory_instantiation_error():
 
 
 def test_absolute_dump_path():
+    cfg = Reference("my.deep.path")
     config_str = Config(
         value=dict(
-            moved=Config(
-                test="ok",
-                __path__=("my", "deep", "path"),
-            ),
-        )
+            moved=cfg,
+        ),
+        my=dict(deep=dict(path=Config(test="ok"))),
     ).to_str()
     assert config_str == (
         "[value]\n"
@@ -417,8 +416,8 @@ size = 128
     assert "extra" not in merged["script"]
     merged = merged.merge(
         {
-            "modelA.date": "2006-06-06",
-            "script.other_extra": {"key": "val"},
+            "modelA": {"date": "2006-06-06"},
+            "script": {"other_extra": {"key": "val"}},
         },
         remove_extra=False,
     )
@@ -480,3 +479,9 @@ value = 12.0
     model = Config.from_str(cfg).resolve(registry=registry)["modelA"]
     assert model.special == 5
     assert model.kw == {"extra": "extra"}
+
+
+def test_partial_interpolation():
+    config = Config.from_str(pipeline_config)
+    model = config["modelB"].resolve(registry=registry, root=config)
+    assert isinstance(model.submodel, SubModel)

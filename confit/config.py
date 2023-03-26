@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import re
 from configparser import ConfigParser
 from io import StringIO
@@ -66,7 +66,7 @@ class MissingReference(Exception):
         """
         String representation of the exception
         """
-        return "Could not interpolate the following reference: ${{{}}}".format(self.ref)
+        return "Could not interpolate the following reference: {}".format(self.ref)
 
 
 class CyclicReferenceError(Exception):
@@ -89,54 +89,6 @@ class CyclicReferenceError(Exception):
         String representation of the exception
         """
         return "Cyclic reference detected at {}".format(join_path(self.path))
-
-
-def resolve_reference(ref: Reference, leaves: Dict[Loc, Any]) -> Any:
-    """
-    Resolves a reference to a value using a dict of already resolved
-    config subtrees.
-
-    Parameters
-    ----------
-    ref: Reference
-        The reference to resolve
-    leaves: Dict[Loc, Any]
-        The already resolved config subtrees
-
-    Raises
-    ------
-    KeyError
-        If a variable in the reference cannot be found
-        in the `leaves` dict.
-
-    Returns
-    -------
-    Any
-    """
-
-    pat = re.compile(
-        r"\b((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)" r"(?::((?:[^\W0-9]\w*\.)*[^\W0-9]\w*))?",
-    )
-
-    local_leaves = {}
-    local_names = {}
-    for i, (key, val) in enumerate(leaves.items()):
-        local_leaves[f"var_{i}"] = val
-        local_names[key] = f"var_{i}"
-
-    def replace(match):
-        var = match.group(1)
-        path = split_path(var)
-        try:
-            return local_names[path] + ("." + match.group(2) if match.group(2) else "")
-        except KeyError:
-            raise KeyError(var)
-
-    replaced = pat.sub(replace, ref)
-
-    res = safe_eval(replaced, local_leaves)
-
-    return res
 
 
 class Config(dict):
@@ -198,7 +150,15 @@ class Config(dict):
                     current = current[part]
 
             current.clear()
-            current.update({k: loads(v) for k, v in parser.items(section)})
+            for k, v in parser.items(section):
+                path = split_path(k)
+                for part in path[:-1]:
+                    if part not in current:
+                        current[part] = current = Config()
+                    else:
+                        current = current[part]
+                current[path[-1]] = loads(v)
+                # current.update({k: loads(v) for k, v in parser.items(section)})
 
         if resolve:
             return config.resolve(registry=registry)
@@ -301,7 +261,7 @@ class Config(dict):
             try:
                 return encode_default(o)
             except Exception:
-                raise TypeError(f"Cannot dump {o!r}")
+                raise TypeError(f"Cannot dump {o!r} at {join_path(path)}")
 
         return rec(self)
 
@@ -328,7 +288,7 @@ class Config(dict):
         parser.write(s)
         return s.getvalue()
 
-    def resolve(self, deep=True, registry: Any = None) -> Any:
+    def resolve(self, deep=True, registry: Any = None, root: Mapping = None) -> Any:
         """
         Resolves the parts of the nested config object with @ variables using
         a registry, and then interpolate references in the config.
@@ -339,11 +299,16 @@ class Config(dict):
             Should we resolve deeply
         registry:
             Registry to use when resolving
+        root: Mapping
+            The root of the config tree. Used for resolving references.
 
         Returns
         -------
         Union[Config, Any]
         """
+        if root is None:
+            root = self
+
         if registry is None:
             from .registry import get_default_registry
 
@@ -351,7 +316,44 @@ class Config(dict):
         resolved_locs = {}
         seen_locs = set()
 
-        def rec(obj, loc=()):
+        def resolve_reference(ref: Reference) -> Any:
+            pat = re.compile(
+                r"\b((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)"
+                r"(?::((?:[^\W0-9]\w*\.)*[^\W0-9]\w*))?",
+            )
+
+            def replace(match):
+                path = match.group(1)
+                parts = split_path(path)
+                try:
+                    return local_names[parts] + (
+                        "." + match.group(2) if match.group(2) else ""
+                    )
+                except KeyError:
+                    raise KeyError(path)
+
+            local_leaves = {}
+            local_names = {}
+            for match in pat.finditer(ref.value):
+                path = match.group(1)
+                parts = split_path(path)
+                current = root
+                for part in parts:
+                    current = current[part]
+                if id(current) not in resolved_locs:
+                    resolved = rec(current, parts)
+                else:
+                    resolved = resolved_locs[id(current)]
+                local_names[parts] = f"var_{len(local_leaves)}"
+                local_leaves[f"var_{len(local_leaves)}"] = resolved
+
+            replaced = pat.sub(replace, ref.value)
+
+            res = safe_eval(replaced, local_leaves)
+
+            return res
+
+        def rec(obj, loc: Tuple[Union[str, int]] = ()):
             """
             Parameters
             ----------
@@ -365,13 +367,13 @@ class Config(dict):
             -------
 
             """
-            if loc in resolved_locs:
-                return resolved_locs[loc]
+            if id(obj) in resolved_locs:
+                return resolved_locs[id(obj)]
 
-            if loc in seen_locs:
-                raise CyclicReferenceError(loc)
+            if id(obj) in seen_locs:
+                raise CyclicReferenceError(tuple(loc))
 
-            seen_locs.add(loc)
+            seen_locs.add(id(obj))
 
             if not deep and len(loc) > 1:
                 return obj
@@ -380,29 +382,20 @@ class Config(dict):
                 resolved = Config({k: rec(v, (*loc, k)) for k, v in obj.items()})
 
                 registries = [
-                    (key, value, registry._catalogue[key[1:]])
+                    (key, value, getattr(registry, key[1:]))
                     for key, value in resolved.items()
                     if key.startswith("@")
                 ]
-                assert len(registries) <= 1, (
-                    f"Cannot resolve using multiple " f"registries at {'.'.join(loc)}"
-                )
+                assert (
+                    len(registries) <= 1
+                ), f"Cannot resolve using multiple registries at {'.'.join(loc)}"
 
                 if len(registries) == 1:
-                    copy = resolved
                     params = dict(resolved)
                     params.pop(registries[0][0])
                     fn = registries[0][2].get(registries[0][1])
                     try:
                         resolved = fn(**params)
-                        try:
-                            resolved.cfg
-                        except Exception:
-                            try:
-                                RESOLVED_TO_CONFIG[resolved] = copy
-                            except Exception:
-                                pass
-
                     except ValidationError as e:
                         raise ValidationError(patch_errors(e.raw_errors, loc), e.model)
             elif isinstance(obj, list):
@@ -410,28 +403,16 @@ class Config(dict):
             elif isinstance(obj, tuple):
                 resolved = tuple(rec(v, (*loc, i)) for i, v in enumerate(obj))
             elif isinstance(obj, Reference):
-                try:
-                    resolved = resolve_reference(obj, resolved_locs)
-                except KeyError as e:
-                    ref_path = e.args[0]
-                    loc = split_path(ref_path)
-
+                resolved = None
+                while resolved is None:
                     try:
-                        current = self
-                        for part in loc:
-                            current = current[part]
+                        resolved = resolve_reference(obj)
                     except KeyError:
                         raise MissingReference(obj)
-
-                    rec(current, loc)
-
-                    resolved = resolve_reference(obj, resolved_locs)
-
-                    return resolved
             else:
                 resolved = obj
 
-            resolved_locs[loc] = resolved
+            resolved_locs[id(obj)] = resolved
 
             return resolved
 
@@ -516,7 +497,7 @@ class Config(dict):
             elif isinstance(obj, tuple):
                 return tuple(rec(v) for v in obj)
             elif isinstance(obj, Reference):
-                return Reference(obj.value, rec(obj.root))
+                return Reference(obj.value)
             else:
                 return obj
 

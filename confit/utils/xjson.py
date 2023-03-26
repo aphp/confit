@@ -5,10 +5,22 @@ from typing import Any, Callable
 from lark import Lark, Transformer, Tree
 
 
-class Reference(str):
+class Reference:
     """
     A path reference to a value in the configuration.
     """
+
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return f"${{{self.value}}}"
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.value == other.value
 
 
 # Extended JSON grammar to parse references and tuples
@@ -198,7 +210,7 @@ def _make_iterencode(
 
     def _iterencode(o):
         if isinstance(o, Reference):
-            yield "${" + o + "}"
+            yield str(o)
         elif isinstance(o, str):
             yield encoder(o)
         elif o is None:

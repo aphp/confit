@@ -226,6 +226,8 @@ class Config(dict):
             return o is None or isinstance(o, (str, int, float, bool, Reference))
 
         def rec(o: Any, path: Loc = ()):
+            if id(o) in refs:
+                return refs[id(o)]
             if is_simple(o):
                 return o
             if isinstance(o, collections.abc.Mapping):
@@ -240,21 +242,22 @@ class Config(dict):
                 )
                 serialized = {k: rec(v, (*path, k)) for k, v in items}
                 serialized = {k: serialized[k] for k in o.keys()}
+                refs[id(o)] = Reference(join_path(path))
                 if isinstance(o, Config):
                     serialized = Config(serialized)
                 return serialized
             if isinstance(o, (list, tuple)):
+                refs[id(o)] = Reference(join_path(path))
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
-            if id(o) in refs:
-                return refs[id(o)]
             cfg = None
             try:
-                cfg = o.cfg
+                cfg = (cfg or Config()).merge(RESOLVED_TO_CONFIG[o])
+            except (KeyError, TypeError):
+                pass
+            try:
+                cfg = (cfg or Config()).merge(o.cfg)
             except AttributeError:
-                try:
-                    cfg = RESOLVED_TO_CONFIG[o]
-                except (KeyError, TypeError):
-                    pass
+                pass
             if cfg is not None:
                 refs[id(o)] = Reference(join_path(path))
                 return rec(cfg, path)
@@ -477,7 +480,6 @@ class Config(dict):
 
         config = self.copy()
         for u in updates:
-            u = u.copy()
             rec(config, u)
         return config
 

@@ -21,10 +21,9 @@ def _resolve_and_validate_call(
     skip_save_params: Sequence[str],
     use_self: bool,
 ):
-    # args = Config.resolve(args)
-    # kwargs = Config.resolve(kwargs)
     values = pydantic_func.build_values(args, kwargs)
-    returned = pydantic_func.call(*args, **kwargs)
+    model = pydantic_func.model(**Config.resolve(values))
+    returned = pydantic_func.execute(model)
     if save_params is not None:
         params = dict(values)
         params_kwargs = params.pop(pydantic_func.v_kwargs_name, {})

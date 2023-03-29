@@ -44,8 +44,8 @@ xjson_grammar = r"""
           | "None"             -> null
           | reference
 
-    list : "[" [value ("," value) * ","?] "]"
-    tuple : "(" [value ("," value) * ","?] ")"
+    list : "[" (value ("," value) * ","?)? "]"
+    tuple : "(" (value ("," value) * ","?)? ")"
 
     dict : "{" [pair ("," pair)*] "}"
     pair : string ":" value

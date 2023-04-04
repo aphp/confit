@@ -9,127 +9,124 @@ le système de validation [Pydantic](https://github.com/pydantic/pydantic) et la
 
 ### Registre
 
-Le registre du catalogue enregistre les différents composants et couches qui peuvent être composés ensemble pour construire un pipeline. Une fois enregistrés, avec le décorateur `registry.factory.register` ces composants sont accessibles en tant que [points d'entrée](https://packaging.python.org/en/latest/specifications/entry-points/#entry-points-specification) et peuvent être utilisés dans le système de configuration.
-Pour commencer, vous pouvez créer un registre simple avec une seule clé `"factory"` comme suit :
-
+Le registre [catalogue](https://github.com/explosion/catalogue) stocke les différents objects (classes ou fonctions) qui peuvent être composés ensemble pour executer votre programme. Une fois enregistrés, avec le décorateur `registry.factory.register` ces objets sont accessibles via les [entry-points](https://packaging.python.org/en/latest/specifications/entry-points/#entry-points-specification) et peuvent être utilisés dans le système de configuration.
+Pour commencer, vous pouvez créer un registre `"factory"` comme suit:
 ```python
-from confit import Registry, set_default_registry
+from confit import Registry, RegistryCollection
 
 
-@set_default_registry
-class registry:
-    factory = Registry(("my_registry", "factory"), entry_points=True)
-
-    _catalogue = dict(
-        factory=factory,
-    )
+class registry(RegistryCollection):
+    factory = Registry(("my_library", "factory"), entry_points=True)
 ```
 
-!!! tip "À quoi-cela sert-il ?"
-    Avec ce registre, vous pouvez *ajouter au registre* soit une fonction ou une classe :
+!!! tip "À quoi cela sert-il ?"
+
+    Avec ce registre, vous pouvez *enregistrer* une fonction ou une classe :
+
     ```python
-    @registry.factory.register("ma-fonction")
-    def ma_fonction(valeur=10):
-        print(f"La valeur est {valeur} !")
+    @registry.factory.register("my-function")
+    def my_function(value=10):
+        print(f"The value is {value}!")
     ```
-    Maintenant, vous pouvez récupérer la fonction de n'importe où :
+
+    Maintenant, vous pouvez récupérer dynamiquement la fonction depuis n'importe où :
+
     ```python
-    func = registry.factory.get("ma-fonction")
+    func = registry.factory.get("my-function")
     func()
-    # Out : "La valeur est 10 !"
-    func(valeur=42)
-    # Out : "La valeur est 42 !"
+    # Out: "The value is 10!"
+    func(value=42)
+    # Out: "The value is 42!"
     ```
 
 ### Système de typage
 
-Le décorateur Pydantic `validate_arguments` permet à une fonction d'analyser et de valider et valider ses arguments à chaque fois qu'elle est appelée, en utilisant le système de validation Pydantic basé sur le typage.
-Par exemple, les chaînes de caractères peuvent être automatiquement transformées en objets Path, en dates ou en nombres.
-en fonction de l'annotation du type de l'argument.
+Le décorateur Pydantic `validate_arguments` améliore une fonction pour analyser et valider automatiquement ses arguments à chaque appel, en utilisant le système de validation basé sur le typage Pydantic.
+Par exemple, les chaînes de caractères peuvent être automatiquement converties en objets Path, ou en objets datetime ou en nombres, en fonction de l'annotation de type de l'argument.
 
-Combiné avec notre système de configuration, les dictionnaires passés en tant qu'arguments d'une fonction décorée peuvent être "castés" (retypés) comme des classes instanciées si ces classes ont été elles-mêmes décorées.
+Combiné avec notre système de configuration, les dictionnaires passés en arguments à une fonction décorée peuvent être "castés" en classes instanciées si ces classes étaient elles-mêmes décorées.
 
 ### CLI
 
-...
+Documentation en cours
 
 ## L'objet Config
 
-L'objet configuration consiste en un dictionnaire superchargé, la classe `Config`, qui peut qui peut être utilisée pour lire et écrire dans les fichiers `cfg`, interpoler les variables et instancier les composants par le biais du registre avec certaines clés spéciales `@factory`. Un fichier cfg peut être utilisé directement comme entrée d'une fonction décorée par le CLI.
+L'objet de configuration, la classe `Config`, est un dictionnaire augmenté qui peut être utilisé pour lire et écrire des fichiers `cfg`, interpoler des variables et instancier des composants via le registre avec des clés spéciales `@factory`.
+Un fichier cfg peut être utilisé directement comme entrée pour une fonction décorée en CLI.
 
-Nous allons exposer quelques exemples partiels de complexité croissante ci-dessous. Voir [ici][un-exemple-simple] pour un exemple de bout en bout.
+Nous montrerons ci-dessous des exemples partiels de complexité croissante. Voir [ici][un-example-simple] pour un exemple complet.
 
 ### Instanciation d'un objet
 
 ```python title="script.py"
-@registry.factory.register("ma-classe")
-class MaClasse:
-    def __init__(self, valeur1 : int, valeur2 : float) :
-        self.valeur1 = valeur1
-        self.valeur2 = valeur2
+@registry.factory.register("my-class")
+class MyClass:
+    def __init__(self, value1: int, value2: float):
+        self.value1 = value1
+        self.value2 = value2
 ```
 
 ```ini title="config.cfg"
-[objet]
-@factory = "ma-classe"
-valeur1 = 1.0
-valeur2 = 2.5
+[myclass]
+@factory = "my-class"
+value1 = 1.1
+value2 = 2.5
 ```
 
 Ici, **Confit** va :
 
 - Analyser la configuration
-- Récupérer la classe cible depuis le registre
-- Valider les paramètres si nécessaire (dans ce cas, `valeur1` est typée comme un int, donc elle sera castée comme un int en mettant `valeur1=1`)
-- Instanciez la classe en utilisant les paramètres validés
+- Récupérer la classe cible à partir du registre
+- Valider les paramètres si nécessaire (dans ce cas, `value1` est typé en tant qu'entier, il sera donc converti en entier en définissant `value1=1`)
+- Instancier la classe en utilisant les paramètres validés
 
 ### Interpolation des valeurs
 
-Lorsque plusieurs sections de la configuration doivent accéder à la même valeur, vous pouvez la fournir en utilisant la syntaxe `${<section.valeur>}` :
+Lorsque plusieurs sections de la configuration doivent accéder à la même valeur, vous pouvez utiliser une référence avec la syntaxe `${<section.value>}` :
 
 ```ini title="config.cfg"
-[objet]
-@factory = "ma-classe"
-valeur1 = 1.1
-valeur2 = ${autres_valeurs.valeur3}
+[myclass]
+@factory = "my-class"
+value1 = 1.1
+value2 = ${other_values.value3}
 
-[autres_valeurs]
-valeur3 = 10
+[other_values]
+value3 = 10
 ```
 
-Ici, `valeur2` sera fixé à 10.
+Ici, `value2` sera défini à 10, comme `value3`.
 
-### Interpolation d'objets
+### Interpolation avancée
 
-Vous pouvez même passer des objets instanciés ! Supposons que nous ayons une classe enregistrée `mon-autre-classe` qui attend une instance de `MaClasse` en entrée. Vous pourriez utiliser la configuration suivante :
+Vous pouvez même passer des objets instanciés ! Supposons que nous ayons une classe enregistrée `myOtherClass` attendant une instance de `MyClass` en entrée. Vous pourriez utiliser la configuration suivante :
 
 ```ini title="config.cfg"
 [func]
-@factory = "mon-autre-classe"
-obj = ${objet}
+@factory = "my-other-class"
+obj = ${myclass}
 
-[objet]
-@factory = "ma-classe"
-valeur1 = 1.1
-valeur2 = ${autres_valeurs.valeur3}
+[myclass]
+@factory = "my-class"
+value1 = 1.1
+value2 = ${other_values.value3}
 
-[autres_valeurs]
-valeur3 = 10
+[other_values]
+value3 = 10
 ```
 
-Enfin, vous pouvez vouloir accéder à certains attributs des classes Python qui sont disponibles *après* l'instanciation, mais qui ne sont pas présents dans le fichier de configuration. Par exemple, modifions notre classe `MaClasse` :
-
+Enfin, vous pouvez vouloir accéder à certains attributs des classes Python qui sont disponibles *après* l'instanciation, mais pas présents dans le fichier de configuration. Par exemple, modifions notre classe `MyClass` :
 
 ```diff title="script.py"
-@registry.factory.register("ma-classe")
-class MaClasse:
-    def __init__(self, valeur1 : int, valeur2 : float) :
-        self.valeur1 = valeur1
-        self.valeur2 = valeur2
-+       self.valeur_cachée = 99
+@registry.factory.register("my-class")
+class MyClass:
+    def __init__(self, value1: int, value2: float):
+        self.value1 = value1
+        self.value2 = value2
++         self.hidden_value = 99
 ```
 
-Pour accéder à ces valeurs directement dans le fichier de configuration, utilisez la syntaxe ${<obj:attribut>} (remarquez les **deux points** au lieu du **point** mentionné [ici][interpolation-dobjets])
+Pour accéder à ces valeurs directement dans le fichier de configuration, utilisez la syntaxe ${<obj:attribut>} (remarquez les **deux points** au lieu du **point**)
 
 
 ```ini title="config.cfg"

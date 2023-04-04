@@ -38,14 +38,14 @@ pytest = "^7.1.1"
 pytest-cov = "^3.0.0"
 
 [tool.interrogate]
-ignore-init-method = true
-ignore-init-module = true
+ignore-init-method = false
+ignore-init-module = false
 ignore-magic = false
-ignore-semiprivate = false
+ignore-semiprivate = true
 ignore-private = false
 ignore-property-decorators = false
 ignore-module = true
-ignore-nested-functions = false
+ignore-nested-functions = true
 ignore-nested-classes = true
 ignore-setters = false
 fail-under = 8
@@ -53,6 +53,7 @@ exclude = ["docs", "build", "tests"]
 verbose = 0
 quiet = false
 whitelist-regex = []
+ignore-regex = ['__(?!init).*__']
 color = true
 omit-covered-files = false
 
@@ -61,13 +62,33 @@ testpaths = [
     "tests",
 ]
 
+[tool.ruff]
+fix = true
+exclude = [
+    ".git",
+    "__pycache__",
+    "__init__.py",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".venv",
+    "build",
+]
+ignore = []
+line-length = 88
+select = [
+    "E",
+    "F",
+    "W",
+    "I001"
+]
+fixable = ["E", "F", "W", "I"]
+
+[tool.ruff.isort]
+known-first-party = ["confit"]
+
 [tool.mypy]
 plugins = "pydantic.mypy"
 
 [build-system]
 requires = ["poetry-core", "cython", "setuptools<=63"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.dephell.main]
-from = {format = "poetry", path = "pyproject.toml"}
-to = {format = "setuppy", path = "setup.py"}

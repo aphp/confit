@@ -1,23 +1,8 @@
 import collections
 import re
-from typing import Any, Dict, Iterable, List, Tuple, TypeVar, Union
+from typing import Any, Dict, Tuple, TypeVar, Union
 
 T = TypeVar("T")
-
-
-def dedup(seq: Iterable["T"]) -> List["T"]:
-    """
-    Remove duplicates from a sequence while preserving order.
-
-    Parameters
-    ----------
-    seq: Iterable[T]
-
-    Returns
-    -------
-    List[T]
-    """
-    return list(dict.fromkeys(seq).keys())
 
 
 def join_path(path):

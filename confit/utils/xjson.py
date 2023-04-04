@@ -10,7 +10,13 @@ class Reference:
     A path reference to a value in the configuration.
     """
 
-    def __init__(self, value):
+    def __init__(self, value: str):
+        """
+        Parameters
+        ----------
+        value: str
+            The path to the value in the configuration.
+        """
         self.value = value
 
     def __repr__(self):
@@ -79,7 +85,13 @@ class XJsonTransformer(Transformer):
     A Lark transformer to parse extended JSON.
     """
 
-    def __init__(self, input_string):
+    def __init__(self, input_string: str):
+        """
+        Parameters
+        ----------
+        input_string: str
+            The input string to parse.
+        """
         super().__init__()
         self.input_string = input_string
 

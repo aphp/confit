@@ -1,5 +1,6 @@
+import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
 
 import catalogue
 import pydantic
@@ -14,29 +15,47 @@ class SignatureError(TypeError):
 
 
 def _resolve_and_validate_call(
-    args: Tuple[Any],
+    args: Sequence[Any],
     kwargs: Dict[str, Any],
-    pydantic_func: pydantic.decorator.ValidatedFunction,
-    save_params: Optional[Dict],
-    skip_save_params: Sequence[str],
+    pydantic_func: Union[pydantic.decorator.ValidatedFunction, Callable],
     use_self: bool,
-):
-    values = pydantic_func.build_values(args, kwargs)
-    model = pydantic_func.model(**Config.resolve(values))
-    returned = pydantic_func.execute(model)
-    if save_params is not None:
-        params = dict(values)
-        params_kwargs = params.pop(pydantic_func.v_kwargs_name, {})
-        resolved = params.pop("self") if use_self else returned
+    invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]],
+) -> Any:
+    returned = None
+    resolved = None
 
-        params_to_save = {**save_params, **params, **params_kwargs}
-        for name in skip_save_params:
-            params_to_save.pop(name, None)
+    # Convert the *args and **kwargs into a dict of values
+    # mapping the parameter name to the value if given
+    signature = inspect.signature(pydantic_func.raw_function)
+    parameters = signature.parameters
+    bound_arguments = signature.bind_partial(*args, **kwargs)
+    values = {}
+    for name, parameter in parameters.items():
+        if parameter.kind == parameter.VAR_KEYWORD:
+            values.update(bound_arguments.arguments[name])
+        elif name in bound_arguments.arguments:
+            values[name] = bound_arguments.arguments[name]
 
-        Config._store_resolved(
-            resolved,
-            Config(params_to_save),
-        )
+    if use_self:
+        resolved = values.pop("self")
+
+    # Call the pydantic model with the values
+    # If an invoker was provided, use it to invoke the function
+    # to allow the user to update the values before calling the function
+    # and/or do something with the result
+    def invoked(kw):
+        nonlocal returned, resolved
+        # "self" must be passed as a positional argument
+        returned = pydantic_func.call(*(resolved,) if use_self else (), **kw)
+        if not use_self:
+            resolved = returned
+        return resolved
+
+    if invoker is not None:
+        invoker(invoked, values)
+    else:
+        invoked(values)
+
     return returned
 
 
@@ -45,8 +64,6 @@ def _check_signature_for_save_params(func: Callable):
     Checks that a function does not expect positional only arguments
     since these are not serializable using a nested dict data structure
     """
-    import inspect
-
     spec = inspect.signature(func)
     if any(
         param.kind == inspect.Parameter.VAR_POSITIONAL
@@ -59,11 +76,12 @@ def validate_arguments(
     func: Optional[Callable] = None,
     *,
     config: Dict = None,
-    save_params: Optional[Dict] = None,
-    skip_save_params: Sequence[str] = (),
+    invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
+    registry: Any = None,
 ) -> Any:
     """
-    Decorator to validate the arguments passed to a function.
+    Decorator to validate the arguments passed to a function and store the result
+    in a mapping from results to call parameters (allowing
 
     Parameters
     ----------
@@ -71,10 +89,10 @@ def validate_arguments(
         The function or class to call
     config: Dict
         The validation configuration object
-    save_params: bool
-        Should we save the function parameters
-    skip_save_params: Sequence[str]
-        List of parameters to skip when saving the function parameters
+    invoker: Optional[Callable]
+        An optional invoker to apply on the validated function
+    registry: Any
+        The registry to use to resolve the default parameters
 
     Returns
     -------
@@ -86,14 +104,13 @@ def validate_arguments(
 
     def validate(_func: Callable) -> Callable:
         if isinstance(_func, type):
+            _func: type
             if hasattr(_func.__init__, "raw_function"):
                 vd = pydantic.decorator.ValidatedFunction(
                     _func.__init__.raw_function, config
                 )
             else:
                 vd = pydantic.decorator.ValidatedFunction(_func.__init__, config)
-            if save_params is not None:
-                _check_signature_for_save_params(vd.raw_function)
             vd.model.__name__ = _func.__name__
             vd.model.__fields__["self"].required = False
 
@@ -120,10 +137,8 @@ def validate_arguments(
                 """
 
                 def _validate(value):
-                    params = value
-
                     if isinstance(value, dict):
-                        value = Config(value).resolve()
+                        value = Config(value).resolve(registry=registry)
 
                     for validator in existing_validators:
                         value = validator(value)
@@ -131,22 +146,7 @@ def validate_arguments(
                     if isinstance(value, _func):
                         return value
 
-                    m = vd.init_model_instance(**value)
-                    d = {
-                        k: v
-                        for k, v in m._iter()
-                        if k in m.__fields_set__ or m.__fields__[k].default_factory
-                    }
-                    var_kwargs = d.pop(vd.v_kwargs_name, {})
-                    resolved = _func(**d, **var_kwargs)
-
-                    if save_params is not None:
-                        params_to_save = {**save_params, **params}
-                        for name in skip_save_params:
-                            params_to_save.pop(name, None)
-                        Config._store_resolved(resolved, params_to_save)
-
-                    return resolved
+                    return _func(**value)
 
                 yield _validate
 
@@ -154,7 +154,11 @@ def validate_arguments(
             @wraps(vd.raw_function)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
                 return _resolve_and_validate_call(
-                    args, kwargs, vd, save_params, skip_save_params, True
+                    args=args,
+                    kwargs=kwargs,
+                    pydantic_func=vd,
+                    use_self=True,
+                    invoker=invoker,
                 )
 
             _func.vd = vd  # type: ignore
@@ -166,18 +170,15 @@ def validate_arguments(
 
         else:
             vd = pydantic.decorator.ValidatedFunction(_func, config)
-            if save_params is not None:
-                _check_signature_for_save_params(vd.raw_function)
 
             @wraps(_func)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
                 return _resolve_and_validate_call(
-                    args,
-                    kwargs,
-                    vd,
-                    save_params,
-                    skip_save_params,
-                    False,
+                    args=args,
+                    kwargs=kwargs,
+                    pydantic_func=vd,
+                    use_self=False,
+                    invoker=invoker,
                 )
 
             wrapper_function.vd = vd  # type: ignore
@@ -197,20 +198,33 @@ class Registry(catalogue.Registry):
     A registry that validates the input arguments of the registered functions.
     """
 
+    def __init__(self, namespace: Sequence[str], entry_points: bool = False) -> None:
+        """
+        Initialize the registry.
+
+        Parameters
+        ----------
+        namespace: Sequence[str]
+            The namespace of the registry
+        entry_points: bool
+            Should we use entry points to load the registered functions
+        """
+        super().__init__(namespace, entry_points=entry_points)
+        self.registry = None
+
     def register(
         self,
         name: str,
         *,
         func: Optional[catalogue.InFunc] = None,
-        save_params=None,
-        **kwargs: Any,
+        save_params: Optional[Dict[str, Any]] = None,
+        skip_save_params: Sequence[str] = (),
+        invoker: Optional[Callable] = None,
     ) -> Callable[[catalogue.InFunc], catalogue.InFunc]:
         """
         This is a convenience wrapper around `catalogue.Registry.register`, that
-        additionally validates the input arguments of the registered function.
-
-        Register a function as a catalogue entry-point, and validate its
-        input arguments.
+        additionally validates the input arguments of the registered function and
+        saves the result of any call to a mapping to its arguments.
 
         Parameters
         ----------
@@ -218,9 +232,16 @@ class Registry(catalogue.Registry):
             The name of the function
         func: Optional[catalogue.InFunc]
             The function to register
-        save_params: Optional[Dict]
+        save_params: Optional[Dict[str, Any]]
             Additional parameters to save when the function is called. If falsy,
-            the function parameters are not saved.
+            the function parameters are not saved
+        skip_save_params: Sequence[str]
+            List of parameters to skip when saving the function parameters
+        invoker: Optional[Callable] = None,
+            An optional invoker to apply to the function before registering it.
+            It is better to use this than to apply the invoker to the function
+            to preserve the signature of the function or the class and enable
+            validating its parameters.
 
         Returns
         -------
@@ -230,25 +251,96 @@ class Registry(catalogue.Registry):
 
         save_params = save_params or {f"@{self.namespace[-1]}": name}
 
+        def invoke(func, params):
+            resolved = invoker(func, params) if invoker is not None else func(params)
+            if save_params is not None:
+                params_to_save = {**save_params, **params}
+                for name in skip_save_params:
+                    params_to_save.pop(name, None)
+                Config._store_resolved(resolved, params_to_save)
+            return resolved
+
         def wrap_and_register(fn: catalogue.InFunc) -> catalogue.InFunc:
-            fn = validate_arguments(
+
+            if save_params is not None:
+                _check_signature_for_save_params(
+                    fn if not isinstance(fn, type) else fn.__init__
+                )
+
+            validated_fn = validate_arguments(
                 fn,
                 config={"arbitrary_types_allowed": True},
-                save_params=save_params,
-                **kwargs,
+                registry=getattr(self, "registry", None),
+                invoker=invoke,
             )
-            return registerer(fn)
+            registerer(validated_fn)
+            return validated_fn
 
         if func is not None:
             return wrap_and_register(func)
         else:
             return wrap_and_register
 
+    def get_available(self) -> Sequence[str]:
+        """Get all functions for a given namespace.
+
+        namespace (Tuple[str]): The namespace to get.
+        RETURNS (Dict[str, Any]): The functions, keyed by name.
+        """
+        result = set()
+        if self.entry_points:
+            result.update({p.name for p in self._get_entry_points()})
+        for keys in catalogue.REGISTRY.copy().keys():
+            if len(self.namespace) == len(keys) - 1 and all(
+                self.namespace[i] == keys[i] for i in range(len(self.namespace))
+            ):
+                result.add(keys[-1])
+        return sorted(result)
+
 
 _default_registry = None
 
 
-def get_default_registry() -> Registry:
+class MetaRegistryCollection(type):
+    """
+    A metaclass for the registry collection that adds it as the
+    registry collection of all registries defined in the body of the class.
+    """
+
+    def __setattr__(self, key, value):
+        assert isinstance(value, Registry)
+        value.registry = self
+        super().__setattr__(key, value)
+
+    def __init__(cls, name, bases, dct):
+        """
+        Initialize the registry collection by adding it-self as the registry collection
+        of all registries.
+
+        Parameters
+        ----------
+        name
+        bases
+        dct
+        """
+        super().__init__(name, bases, dct)
+        for key, value in dct.items():
+            if isinstance(value, Registry):
+                value.registry = cls
+
+
+class RegistryCollection(metaclass=MetaRegistryCollection):
+    """
+    A collection of registries.
+
+    ```python
+    class MyRegistries(RegistryCollection):
+        my_registry = Registry(("package_name", "my_registry"), entry_points=True)
+        my_other_registry = Registry(("package_name", "my_other_registry"))
+    """
+
+
+def get_default_registry() -> Any:
     """
     Get the default registered registry.
 
@@ -259,7 +351,10 @@ def get_default_registry() -> Registry:
     return _default_registry
 
 
-def set_default_registry(registry: Registry) -> Registry:
+CustomRegistry = TypeVar("CustomRegistry")
+
+
+def set_default_registry(registry: CustomRegistry) -> CustomRegistry:
     """
     Set the default registered registry. This is used in
     [`Config.resolve()`][confit.config.Config.resolve] when no registry is provided.

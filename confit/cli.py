@@ -75,6 +75,7 @@ class Cli(Typer):
         deprecated: bool = False,
         # Rich settings
         rich_help_panel: Union[str, None] = Default(None),
+        registry: Any = None,
     ) -> Callable[[CommandFunctionType], CommandFunctionType]:
         typer_command = super().command(
             name=name,
@@ -114,7 +115,7 @@ class Cli(Typer):
                         parts = k.split(".")
                         if (
                             parts[0] in validated.model.__fields__
-                            and not parts[0] in config
+                            and parts[0] not in config
                         ):
                             parts = (name, *parts)
                     current = config
@@ -126,7 +127,7 @@ class Cli(Typer):
                         current = current.setdefault(part, Config())
                     current[parts[-1]] = v
                 try:
-                    resolved_config = config.resolve()
+                    resolved_config = config.resolve(registry=registry)
                     default_seed = validated.model.__fields__.get("seed")
                     seed = config.get(name, {}).get("seed", default_seed)
                     if seed is not None:
@@ -134,7 +135,7 @@ class Cli(Typer):
                     if has_meta:
                         config_meta = dict(
                             config_path=config_path,
-                            resolved_config=config.resolve(),
+                            resolved_config=resolved_config,
                             unresolved_config=config,
                         )
                         return validated(

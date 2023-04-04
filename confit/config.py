@@ -3,7 +3,7 @@ import re
 from configparser import ConfigParser
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Sequence, Tuple, TypeVar, Union
 from weakref import WeakKeyDictionary
 
 from pydantic import ValidationError
@@ -17,6 +17,10 @@ from confit.utils.xjson import Reference, dumps, loads
 RESOLVED_TO_CONFIG = WeakKeyDictionary()
 
 Loc = Tuple[Union[int, str]]
+T = TypeVar("T")
+
+PATH_PART = r"(?:(?:'(?:[^\W0-9?][.\w]*)'|\"(?:[^\W0-9][.\w]*)\"|(?:[^\W0-9]\w*)))"
+PATH = rf"(?:(?:{PATH_PART}[.])*{PATH_PART})"
 
 
 def patch_errors(
@@ -320,26 +324,28 @@ class Config(dict):
         seen_locs = set()
 
         def resolve_reference(ref: Reference) -> Any:
-            pat = re.compile(
-                r"\b((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)"
-                r"(?::((?:[^\W0-9]\w*\.)*[^\W0-9]\w*))?",
-            )
+            pat = re.compile(PATH + ":?")
 
-            def replace(match):
-                path = match.group(1)
-                parts = split_path(path)
+            def replace(match: re.Match):
+                start = match.start()
+                if start > 0 and ref.value[start - 1] == ":":
+                    return match.group()
+
+                path = match.group()
+                parts = split_path(path.rstrip(":"))
                 try:
-                    return local_names[parts] + (
-                        "." + match.group(2) if match.group(2) else ""
-                    )
+                    return local_names[parts] + ("." if path.endswith(":") else "")
                 except KeyError:
                     raise KeyError(path)
 
             local_leaves = {}
             local_names = {}
             for match in pat.finditer(ref.value):
-                path = match.group(1)
-                parts = split_path(path)
+                start = match.start()
+                if start > 0 and ref.value[start - 1] == ":":
+                    continue
+                path = match.group()
+                parts = split_path(path.rstrip(":"))
                 current = root
                 for part in parts:
                     current = current[part]
@@ -394,11 +400,17 @@ class Config(dict):
                 ), f"Cannot resolve using multiple registries at {'.'.join(loc)}"
 
                 if len(registries) == 1:
+                    cfg = resolved
                     params = dict(resolved)
                     params.pop(registries[0][0])
                     fn = registries[0][2].get(registries[0][1])
                     try:
                         resolved = fn(**params)
+                        # The `validate_arguments` decorator has most likely
+                        # already put the resolved config in the registry
+                        # but for components that are instantiated without it
+                        # we need to do it here
+                        Config._store_resolved(resolved, cfg)
                     except ValidationError as e:
                         raise ValidationError(patch_errors(e.raw_errors, loc), e.model)
             elif isinstance(obj, list):
@@ -483,7 +495,19 @@ class Config(dict):
             rec(config, u)
         return config
 
-    def copy(self: Any) -> Any:
+    def copy(self: T) -> T:
+        """
+        Deep copy of the config, but not of the underlying data.
+        Should also work with other types of objects (e.g. lists, tuples, etc.)
+
+        ```
+        Config.copy([1, 2, {"ok": 3}}]) == [1, 2, {"ok": 3}]
+        ```
+
+        Returns
+        -------
+        Any
+        """
         seen = {}
 
         def rec(obj):
@@ -507,7 +531,7 @@ class Config(dict):
         return copy
 
     @classmethod
-    def _store_resolved(cls, resolved: Any, config: "Config"):
+    def _store_resolved(cls, resolved: Any, config: Dict[str, Any]):
         """
         Adds a resolved object to the RESOLVED_TO_CONFIG dict
         for later retrieval during serialization

@@ -2,22 +2,17 @@ import datetime
 
 from typer.testing import CliRunner
 
-from confit import Cli, Config, Registry
-from confit.registry import set_default_registry
+from confit import Cli, Registry
+from confit.registry import RegistryCollection, set_default_registry
 
 runner = CliRunner()
 
 
-@set_default_registry
-class RegistryCollection:
+class registry(RegistryCollection):
     factory = Registry(("test_cli", "factory"), entry_points=True)
 
-    _catalogue = dict(
-        factory=factory,
-    )
 
-
-registry = RegistryCollection()
+set_default_registry(registry)
 
 
 class CustomClass:
@@ -103,10 +98,9 @@ app_with_meta = Cli(pretty_exceptions_show_locals=False)
 
 
 @app_with_meta.command(name="script")
-def function(
+def app_with_meta_function(
     modelA: BigModel, modelB: BigModel, other: int, seed: int, config_meta=None
 ):
-
     assert modelA.submodel is modelB.submodel
     assert modelA.date == datetime.date(2010, 10, 10)
 
@@ -117,7 +111,6 @@ def function(
 
 
 def test_cli_working_with_meta(change_test_dir):
-
     result = runner.invoke(
         app_with_meta,
         [
@@ -155,7 +148,7 @@ bool_app = Cli(pretty_exceptions_show_locals=False)
 
 
 @bool_app.command(name="script")
-def function(bool_value: bool, str_value: str):
+def boll_app_function(bool_value: bool, str_value: str):
     print("BOOL:", bool_value)
     print("STR:", str_value)
 

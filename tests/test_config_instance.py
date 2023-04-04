@@ -5,18 +5,12 @@ from pydantic import ValidationError, validate_arguments
 
 from confit import Config, Registry
 from confit.config import CyclicReferenceError, MissingReference, Reference
+from confit.registry import RegistryCollection
 from confit.utils.xjson import dumps, loads
 
 
-class RegistryCollection:
+class registry(RegistryCollection):
     factory = Registry(("test_config", "factory"), entry_points=True)
-
-    _catalogue = dict(
-        factory=factory,
-    )
-
-
-registry = RegistryCollection()
 
 
 class CustomClass:
@@ -57,16 +51,16 @@ modelB = ${modelB}
 hidden_value = ${modelA:hidden_value}
 
 [modelA]
-date = "2003-02-01"
 @factory = "bigmodel"
+date = "2003-02-01"
 
 [modelA.submodel]
 @factory = "submodel"
 value = 12.0
 
 [modelB]
-date = "2003-04-05"
 @factory = "bigmodel"
+date = "2003-04-05"
 submodel = ${modelA.submodel}
 
 """
@@ -109,6 +103,15 @@ def test_write_to_str():
 
     exported = reexport(pipeline_config)
     assert reexport(exported) == exported
+
+
+# store to a temp file
+def test_to_disk(tmp_path):
+    dest = tmp_path / "test.cfg"
+    config = Config().from_str(pipeline_config)
+    config.to_disk(dest)
+    config2 = Config().from_disk(dest)
+    assert config == config2
 
 
 def test_write_resolved_to_str():
@@ -437,13 +440,13 @@ size = 128
 def test_cyclic_reference():
     config = """\
 [modelA]
-date = "2003-02-01"
 @factory = "bigmodel"
+date = "2003-02-01"
 submodel = ${modelB}
 
 [modelB]
-date = "2010-02-01"
 @factory = "bigmodel"
+date = "2010-02-01"
 submodel = ${modelA}
 
 """
@@ -485,3 +488,20 @@ def test_partial_interpolation():
     config = Config.from_str(pipeline_config)
     model = config["modelB"].resolve(registry=registry, root=config)
     assert isinstance(model.submodel, SubModel)
+
+
+def test_deep_key():
+    config = Config.from_str(
+        """
+    [section]
+    deep.key = "ok"
+    """
+    )
+    assert config["section"]["deep"] == {"key": "ok"}
+
+
+def test_root_level_config_error():
+    with pytest.raises(Exception) as exc_info:
+        Config({"ok": "ok"}).to_str()
+
+    assert "root level config" in str(exc_info.value)

@@ -1,21 +1,11 @@
-from datetime import datetime
-
-import pydantic.error_wrappers
 import pytest
 
 from confit import Registry
-from confit.registry import SignatureError, validate_arguments
+from confit.registry import RegistryCollection, SignatureError, validate_arguments
 
 
-class RegistryCollection:
+class registry(RegistryCollection):
     factory = Registry(("test_config", "factory"), entry_points=True)
-
-    _catalogue = dict(
-        factory=factory,
-    )
-
-
-registry = RegistryCollection()
 
 
 @registry.factory.register("good-model")
@@ -41,8 +31,10 @@ def test_fail_args():
 
     assert "positional only args or duplicated kwargs" in str(e.value)
 
-    with pytest.raises(pydantic.error_wrappers.ValidationError) as e:
+    with pytest.raises(TypeError) as e:
         GoodModel(3, value=4)
+
+    assert str(e.value) == "multiple values for argument 'value'"
 
 
 def test_validate_decorator():
@@ -51,4 +43,4 @@ def test_validate_decorator():
             self.value = value
 
     validated = validate_arguments()(GoodModel)
-    assert validated(3).value == 3
+    assert validated("3").value == 3

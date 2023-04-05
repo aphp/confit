@@ -10,8 +10,6 @@ We welcome contributions ! There are many ways to help. For example, you can:
 
 To be able to run the test suite and develop your own pipeline, you should clone the repo and install it locally.
 
-We use [Poetry](https://python-poetry.org) to manage dependencies. See the [installation instructions](https://python-poetry.org/docs/#installation).
-
 <div class="termy">
 
 ```console
@@ -21,8 +19,8 @@ $ git clone ssh://git@github.com/aphp/confit.git
 
 $ cd confit
 
-color:gray # Install the dependencies
-$ poetry install
+color:gray # Install the library with its dev dependencies
+$ pip install -e ".[dev]"
 ```
 
 </div>

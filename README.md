@@ -24,17 +24,10 @@ Here is an example:
 <h5 a><strong><code>script.py</code></strong></h5>
 
 ```diff
-+ from confit import Cli, Registry, set_default_registry
- 
-+ app = Cli(pretty_exceptions_show_locals=False)
- 
-+ @set_default_registry
-+ class RegistryCollection:
++ from confit import Cli, Registry, RegistryCollection
+  
++ class registry(RegistryCollection):
 +     factory = Registry(("test_cli", "factory"), entry_points=True)
-+
-+     _catalogue = dict(
-+         factory=factory,
-+     )
  
 + @registry.factory.register("submodel")
 class SubModel:
@@ -50,8 +43,9 @@ class BigModel:
         self.date = date
         self.submodel = submodel
  
++ app = Cli(pretty_exceptions_show_locals=False)
  
-+ @app.command(name="script")
++ @app.command(name="script", registry=registry)
 def func(modelA: BigModel, modelB: BigModel, other: int, seed: int):
     assert modelA.submodel is modelB.submodel
     assert modelA.date == datetime.date(2010, 10, 10)

@@ -148,7 +148,7 @@ bool_app = Cli(pretty_exceptions_show_locals=False)
 
 
 @bool_app.command(name="script")
-def boll_app_function(bool_value: bool, str_value: str):
+def bool_app_function(bool_value: bool, str_value: str):
     print("BOOL:", bool_value)
     print("STR:", str_value)
 

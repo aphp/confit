@@ -91,11 +91,11 @@ Package:
   stage: package
   before_script:
     - apt-get update -y; apt-get install git -y;
-    - pip install --upgrade pip; pip install twine;
+    - pip install --upgrade pip; pip install twine build;
     - export LAST_RELEASE=`git ls-remote --tags --refs --sort="v:refname" $CI_PROJECT_URL.git | tail -n1 | sed 's/.*\///'`
     - echo $LAST_RELEASE
   script:
-    - python setup.py sdist
+    - python -m build --sdist
     - python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi/ -u gitlab-ci-token -p ${CI_JOB_TOKEN} dist/*
   only:
     - tags

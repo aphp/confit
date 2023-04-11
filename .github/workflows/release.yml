@@ -14,51 +14,36 @@ on:
 
 jobs:
   PyPI:
-    name: Build wheels and push to PyPI
+    name: Upload to PyPI
+
+    needs: [build_sdist]
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-
-      - name: Build wheels
-        run: poetry build
-
-      - name: Publish to PyPI
-        run: poetry publish -u __token__ -p ${{ secrets.PYPI_API_TOKEN }}
+    - uses: actions/download-artifact@v2
+      with:
+        name: artifact
+        path: dist
+    - name: Publish package
+      uses: pypa/gh-action-pypi-publish@v1.5.0
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
 
   Documentation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-
-      - name: Set PY variable
-        run: echo "PY=$(python -VV | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
-
-      - name: Install Poetry
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry config cache-dir ~/.cache/poetry
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/.cache/poetry
-          key: poetry|${{ env.PY }}|${{ hashFiles('poetry.lock') }}
-
-      - name: Install dependencies
-        run: poetry install
-
-      - name: Set up Git
-        run: |
-          git config user.name ${{ github.actor }}
-          git config user.email ${{ github.actor }}@users.noreply.github.com
-
-      - name: Build documentation
-        run: |
-          git fetch origin gh-pages
-          poetry run mike deploy --push --no-redirect --update-aliases $GITHUB_REF_NAME latest
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e '.[dev]'
+    - name: Set up Git
+      run: |
+        git config user.name ${{ github.actor }}
+        git config user.email ${{ github.actor }}@users.noreply.github.com
+    - name: Build documentation
+      run: |
+        git fetch origin gh-pages
+        mike deploy --push --no-redirect --update-aliases $GITHUB_REF_NAME latest

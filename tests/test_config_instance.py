@@ -5,18 +5,12 @@ from pydantic import ValidationError, validate_arguments
 
 from confit import Config, Registry
 from confit.config import CyclicReferenceError, MissingReference, Reference
+from confit.registry import RegistryCollection
 from confit.utils.xjson import dumps, loads
 
 
-class RegistryCollection:
+class registry(RegistryCollection):
     factory = Registry(("test_config", "factory"), entry_points=True)
-
-    _catalogue = dict(
-        factory=factory,
-    )
-
-
-registry = RegistryCollection()
 
 
 class CustomClass:
@@ -57,16 +51,16 @@ modelB = ${modelB}
 hidden_value = ${modelA:hidden_value}
 
 [modelA]
-date = "2003-02-01"
 @factory = "bigmodel"
+date = "2003-02-01"
 
 [modelA.submodel]
 @factory = "submodel"
 value = 12.0
 
 [modelB]
-date = "2003-04-05"
 @factory = "bigmodel"
+date = "2003-04-05"
 submodel = ${modelA.submodel}
 
 """
@@ -111,6 +105,15 @@ def test_write_to_str():
     assert reexport(exported) == exported
 
 
+# store to a temp file
+def test_to_disk(tmp_path):
+    dest = tmp_path / "test.cfg"
+    config = Config().from_str(pipeline_config)
+    config.to_disk(dest)
+    config2 = Config().from_disk(dest)
+    assert config == config2
+
+
 def test_write_resolved_to_str():
     s = Config().from_str(pipeline_config, resolve=True, registry=registry)
     assert s["modelA"] is s["script"]["modelA"]
@@ -123,16 +126,16 @@ modelB = ${modelB}
 hidden_value = 10
 
 [modelA]
-date = "2003-02-01"
 @factory = "bigmodel"
+date = "2003-02-01"
 
 [modelA.submodel]
 @factory = "submodel"
 value = 12.0
 
 [modelB]
-date = "2003-04-05"
 @factory = "bigmodel"
+date = "2003-04-05"
 submodel = ${modelA.submodel}
 
 """
@@ -374,13 +377,12 @@ def test_factory_instantiation_error():
 
 
 def test_absolute_dump_path():
+    cfg = Reference("my.deep.path")
     config_str = Config(
         value=dict(
-            moved=Config(
-                test="ok",
-                __path__=("my", "deep", "path"),
-            ),
-        )
+            moved=cfg,
+        ),
+        my=dict(deep=dict(path=Config(test="ok"))),
     ).to_str()
     assert config_str == (
         "[value]\n"
@@ -417,8 +419,8 @@ size = 128
     assert "extra" not in merged["script"]
     merged = merged.merge(
         {
-            "modelA.date": "2006-06-06",
-            "script.other_extra": {"key": "val"},
+            "modelA": {"date": "2006-06-06"},
+            "script": {"other_extra": {"key": "val"}},
         },
         remove_extra=False,
     )
@@ -438,13 +440,13 @@ size = 128
 def test_cyclic_reference():
     config = """\
 [modelA]
-date = "2003-02-01"
 @factory = "bigmodel"
+date = "2003-02-01"
 submodel = ${modelB}
 
 [modelB]
-date = "2010-02-01"
 @factory = "bigmodel"
+date = "2010-02-01"
 submodel = ${modelA}
 
 """
@@ -480,3 +482,26 @@ value = 12.0
     model = Config.from_str(cfg).resolve(registry=registry)["modelA"]
     assert model.special == 5
     assert model.kw == {"extra": "extra"}
+
+
+def test_partial_interpolation():
+    config = Config.from_str(pipeline_config)
+    model = config["modelB"].resolve(registry=registry, root=config)
+    assert isinstance(model.submodel, SubModel)
+
+
+def test_deep_key():
+    config = Config.from_str(
+        """
+    [section]
+    deep.key = "ok"
+    """
+    )
+    assert config["section"]["deep"] == {"key": "ok"}
+
+
+def test_root_level_config_error():
+    with pytest.raises(Exception) as exc_info:
+        Config({"ok": "ok"}).to_str()
+
+    assert "root level config" in str(exc_info.value)

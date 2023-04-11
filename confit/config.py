@@ -1,10 +1,9 @@
-import collections
+import collections.abc
 import re
 from configparser import ConfigParser
-from copy import deepcopy
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Sequence, Tuple, TypeVar, Union
 from weakref import WeakKeyDictionary
 
 from pydantic import ValidationError
@@ -18,6 +17,10 @@ from confit.utils.xjson import Reference, dumps, loads
 RESOLVED_TO_CONFIG = WeakKeyDictionary()
 
 Loc = Tuple[Union[int, str]]
+T = TypeVar("T")
+
+PATH_PART = r"(?:(?:'(?:[^\W0-9?][.\w]*)'|\"(?:[^\W0-9][.\w]*)\"|(?:[^\W0-9]\w*)))"
+PATH = rf"(?:(?:{PATH_PART}[.])*{PATH_PART})"
 
 
 def patch_errors(
@@ -67,7 +70,7 @@ class MissingReference(Exception):
         """
         String representation of the exception
         """
-        return "Could not interpolate the following reference: ${{{}}}".format(self.ref)
+        return "Could not interpolate the following reference: {}".format(self.ref)
 
 
 class CyclicReferenceError(Exception):
@@ -92,54 +95,6 @@ class CyclicReferenceError(Exception):
         return "Cyclic reference detected at {}".format(join_path(self.path))
 
 
-def resolve_reference(ref: Reference, leaves: Dict[Loc, Any]) -> Any:
-    """
-    Resolves a reference to a value using a dict of already resolved
-    config subtrees.
-
-    Parameters
-    ----------
-    ref: Reference
-        The reference to resolve
-    leaves: Dict[Loc, Any]
-        The already resolved config subtrees
-
-    Raises
-    ------
-    KeyError
-        If a variable in the reference cannot be found
-        in the `leaves` dict.
-
-    Returns
-    -------
-    Any
-    """
-
-    pat = re.compile(
-        r"\b((?:[^\W0-9]\w*\.)*[^\W0-9]\w*)" r"(?::((?:[^\W0-9]\w*\.)*[^\W0-9]\w*))?",
-    )
-
-    local_leaves = {}
-    local_names = {}
-    for i, (key, val) in enumerate(leaves.items()):
-        local_leaves[f"var_{i}"] = val
-        local_names[key] = f"var_{i}"
-
-    def replace(match):
-        var = match.group(1)
-        path = split_path(var)
-        try:
-            return local_names[path] + ("." + match.group(2) if match.group(2) else "")
-        except KeyError:
-            raise KeyError(var)
-
-    replaced = pat.sub(replace, ref)
-
-    res = safe_eval(replaced, local_leaves)
-
-    return res
-
-
 class Config(dict):
     """
     The configuration system consists of a supercharged dict, the `Config` class,
@@ -162,15 +117,7 @@ class Config(dict):
         if len(args) == 1 and isinstance(args[0], dict):
             assert len(kwargs) == 0
             kwargs = args[0]
-        path: Loc = kwargs.pop("__path__", None)
-        kwargs = {
-            key: Config(value)
-            if isinstance(value, dict) and not isinstance(value, Config)
-            else value
-            for key, value in kwargs.items()
-        }
         super().__init__(**kwargs)
-        self.__path__: Loc = path
 
     @classmethod
     def from_str(cls, s: str, resolve: bool = False, registry: Any = None) -> Any:
@@ -207,7 +154,15 @@ class Config(dict):
                     current = current[part]
 
             current.clear()
-            current.update({k: loads(v) for k, v in parser.items(section)})
+            for k, v in parser.items(section):
+                path = split_path(k)
+                for part in path[:-1]:
+                    if part not in current:
+                        current[part] = current = Config()
+                    else:
+                        current = current[part]
+                current[path[-1]] = loads(v)
+                # current.update({k: loads(v) for k, v in parser.items(section)})
 
         if resolve:
             return config.resolve(registry=registry)
@@ -275,43 +230,45 @@ class Config(dict):
             return o is None or isinstance(o, (str, int, float, bool, Reference))
 
         def rec(o: Any, path: Loc = ()):
+            if id(o) in refs:
+                return refs[id(o)]
             if is_simple(o):
                 return o
-            if isinstance(o, collections.Mapping):
+            if isinstance(o, collections.abc.Mapping):
                 items = sorted(
                     o.items(),
                     key=lambda x: 1
                     if (
                         is_simple(x[1])
-                        or isinstance(x[1], (collections.Mapping, list, tuple))
+                        or isinstance(x[1], (collections.abc.Mapping, list, tuple))
                     )
                     else 0,
                 )
                 serialized = {k: rec(v, (*path, k)) for k, v in items}
                 serialized = {k: serialized[k] for k in o.keys()}
+                refs[id(o)] = Reference(join_path(path))
                 if isinstance(o, Config):
                     serialized = Config(serialized)
-                    serialized.__path__ = o.__path__
                 return serialized
             if isinstance(o, (list, tuple)):
+                refs[id(o)] = Reference(join_path(path))
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
-            if id(o) in refs:
-                return refs[id(o)]
             cfg = None
             try:
-                cfg = o.cfg
+                cfg = (cfg or Config()).merge(RESOLVED_TO_CONFIG[o])
+            except (KeyError, TypeError):
+                pass
+            try:
+                cfg = (cfg or Config()).merge(o.cfg)
             except AttributeError:
-                try:
-                    cfg = RESOLVED_TO_CONFIG[o]
-                except (KeyError, TypeError):
-                    pass
+                pass
             if cfg is not None:
                 refs[id(o)] = Reference(join_path(path))
                 return rec(cfg, path)
             try:
                 return encode_default(o)
             except Exception:
-                raise TypeError(f"Cannot dump {o!r}")
+                raise TypeError(f"Cannot dump {o!r} at {join_path(path)}")
 
         return rec(self)
 
@@ -326,22 +283,7 @@ class Config(dict):
         """
         additional_sections = {}
 
-        def rec(o, path=()):
-            if isinstance(o, collections.Mapping):
-                if isinstance(o, Config) and o.__path__ is not None:
-                    res = {k: rec(v, (*o.__path__, k)) for k, v in o.items()}
-                    current = additional_sections
-                    for part in o.__path__[:-1]:
-                        current = current.setdefault(part, Config())
-                    current[o.__path__[-1]] = res
-                    return Reference(join_path(o.__path__))
-                elif isinstance(o, (tuple, list)):
-                    return type(o)(rec(item) for item in o)
-                else:
-                    return {k: rec(v, (*path, k)) for k, v in o.items()}
-            return o
-
-        prepared = flatten_sections(rec(Config.serialize(self)))
+        prepared = flatten_sections(Config.serialize(self))
         prepared.update(flatten_sections(additional_sections))
 
         parser = ConfigParser()
@@ -353,7 +295,7 @@ class Config(dict):
         parser.write(s)
         return s.getvalue()
 
-    def resolve(self, deep=True, registry: Any = None) -> Any:
+    def resolve(self, deep=True, registry: Any = None, root: Mapping = None) -> Any:
         """
         Resolves the parts of the nested config object with @ variables using
         a registry, and then interpolate references in the config.
@@ -364,11 +306,16 @@ class Config(dict):
             Should we resolve deeply
         registry:
             Registry to use when resolving
+        root: Mapping
+            The root of the config tree. Used for resolving references.
 
         Returns
         -------
         Union[Config, Any]
         """
+        if root is None:
+            root = self
+
         if registry is None:
             from .registry import get_default_registry
 
@@ -376,7 +323,46 @@ class Config(dict):
         resolved_locs = {}
         seen_locs = set()
 
-        def rec(obj, loc=()):
+        def resolve_reference(ref: Reference) -> Any:
+            pat = re.compile(PATH + ":?")
+
+            def replace(match: re.Match):
+                start = match.start()
+                if start > 0 and ref.value[start - 1] == ":":
+                    return match.group()
+
+                path = match.group()
+                parts = split_path(path.rstrip(":"))
+                try:
+                    return local_names[parts] + ("." if path.endswith(":") else "")
+                except KeyError:
+                    raise KeyError(path)
+
+            local_leaves = {}
+            local_names = {}
+            for match in pat.finditer(ref.value):
+                start = match.start()
+                if start > 0 and ref.value[start - 1] == ":":
+                    continue
+                path = match.group()
+                parts = split_path(path.rstrip(":"))
+                current = root
+                for part in parts:
+                    current = current[part]
+                if id(current) not in resolved_locs:
+                    resolved = rec(current, parts)
+                else:
+                    resolved = resolved_locs[id(current)]
+                local_names[parts] = f"var_{len(local_leaves)}"
+                local_leaves[f"var_{len(local_leaves)}"] = resolved
+
+            replaced = pat.sub(replace, ref.value)
+
+            res = safe_eval(replaced, local_leaves)
+
+            return res
+
+        def rec(obj, loc: Tuple[Union[str, int]] = ()):
             """
             Parameters
             ----------
@@ -390,13 +376,13 @@ class Config(dict):
             -------
 
             """
-            if loc in resolved_locs:
-                return resolved_locs[loc]
+            if id(obj) in resolved_locs:
+                return resolved_locs[id(obj)]
 
-            if loc in seen_locs:
-                raise CyclicReferenceError(loc)
+            if id(obj) in seen_locs:
+                raise CyclicReferenceError(tuple(loc))
 
-            seen_locs.add(loc)
+            seen_locs.add(id(obj))
 
             if not deep and len(loc) > 1:
                 return obj
@@ -405,29 +391,26 @@ class Config(dict):
                 resolved = Config({k: rec(v, (*loc, k)) for k, v in obj.items()})
 
                 registries = [
-                    (key, value, registry._catalogue[key[1:]])
+                    (key, value, getattr(registry, key[1:]))
                     for key, value in resolved.items()
                     if key.startswith("@")
                 ]
-                assert len(registries) <= 1, (
-                    f"Cannot resolve using multiple " f"registries at {'.'.join(loc)}"
-                )
+                assert (
+                    len(registries) <= 1
+                ), f"Cannot resolve using multiple registries at {'.'.join(loc)}"
 
                 if len(registries) == 1:
-                    copy = resolved
+                    cfg = resolved
                     params = dict(resolved)
                     params.pop(registries[0][0])
                     fn = registries[0][2].get(registries[0][1])
                     try:
                         resolved = fn(**params)
-                        try:
-                            resolved.cfg
-                        except Exception:
-                            try:
-                                RESOLVED_TO_CONFIG[resolved] = copy
-                            except Exception:
-                                pass
-
+                        # The `validate_arguments` decorator has most likely
+                        # already put the resolved config in the registry
+                        # but for components that are instantiated without it
+                        # we need to do it here
+                        Config._store_resolved(resolved, cfg)
                     except ValidationError as e:
                         raise ValidationError(patch_errors(e.raw_errors, loc), e.model)
             elif isinstance(obj, list):
@@ -435,28 +418,16 @@ class Config(dict):
             elif isinstance(obj, tuple):
                 resolved = tuple(rec(v, (*loc, i)) for i, v in enumerate(obj))
             elif isinstance(obj, Reference):
-                try:
-                    resolved = resolve_reference(obj, resolved_locs)
-                except KeyError as e:
-                    ref_path = e.args[0]
-                    loc = split_path(ref_path)
-
+                resolved = None
+                while resolved is None:
                     try:
-                        current = self
-                        for part in loc:
-                            current = current[part]
+                        resolved = resolve_reference(obj)
                     except KeyError:
                         raise MissingReference(obj)
-
-                    rec(current, loc)
-
-                    resolved = resolve_reference(obj, resolved_locs)
-
-                    return resolved
             else:
                 resolved = obj
 
-            resolved_locs[loc] = resolved
+            resolved_locs[id(obj)] = resolved
 
             return resolved
 
@@ -483,17 +454,9 @@ class Config(dict):
         """
 
         def deep_set(current, path, val):
-            try:
-                path = split_path(path)
-                for part in path[:-1]:
-                    current = (
-                        current[part] if remove_extra else current.setdefault(part, {})
-                    )
-            except KeyError:
+            if path not in current and remove_extra:
                 return
-            if path[-1] not in current and remove_extra:
-                return
-            current[path[-1]] = val
+            current[path] = val
 
         def rec(old, new):
             for key, new_val in list(new.items()):
@@ -527,14 +490,48 @@ class Config(dict):
                     old[key] = new_val
             return old
 
-        config = deepcopy(self)
+        config = self.copy()
         for u in updates:
-            u = deepcopy(u)
             rec(config, u)
-        return Config(**config)
+        return config
+
+    def copy(self: T) -> T:
+        """
+        Deep copy of the config, but not of the underlying data.
+        Should also work with other types of objects (e.g. lists, tuples, etc.)
+
+        ```
+        Config.copy([1, 2, {"ok": 3}}]) == [1, 2, {"ok": 3}]
+        ```
+
+        Returns
+        -------
+        Any
+        """
+        seen = {}
+
+        def rec(obj):
+            if id(obj) in seen:
+                return seen[id(obj)]
+            seen[id(obj)] = obj
+            if isinstance(obj, (Config, dict)):
+                return type(obj)(
+                    {k: rec(v) for k, v in obj.items()},
+                )
+            elif isinstance(obj, list):
+                return [rec(v) for v in obj]
+            elif isinstance(obj, tuple):
+                return tuple(rec(v) for v in obj)
+            elif isinstance(obj, Reference):
+                return Reference(obj.value)
+            else:
+                return obj
+
+        copy = rec(self)
+        return copy
 
     @classmethod
-    def _store_resolved(cls, resolved: Any, config: "Config"):
+    def _store_resolved(cls, resolved: Any, config: Dict[str, Any]):
         """
         Adds a resolved object to the RESOLVED_TO_CONFIG dict
         for later retrieval during serialization

@@ -5,10 +5,28 @@ from typing import Any, Callable
 from lark import Lark, Transformer, Tree
 
 
-class Reference(str):
+class Reference:
     """
     A path reference to a value in the configuration.
     """
+
+    def __init__(self, value: str):
+        """
+        Parameters
+        ----------
+        value: str
+            The path to the value in the configuration.
+        """
+        self.value = value
+
+    def __repr__(self):
+        return f"${{{self.value}}}"
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        return self.value == other.value
 
 
 # Extended JSON grammar to parse references and tuples
@@ -32,8 +50,8 @@ xjson_grammar = r"""
           | "None"             -> null
           | reference
 
-    list : "[" [value ("," value) * ","?] "]"
-    tuple : "(" [value ("," value) * ","?] ")"
+    list : "[" (value ("," value) * ","?)? "]"
+    tuple : "(" (value ("," value) * ","?)? ")"
 
     dict : "{" [pair ("," pair)*] "}"
     pair : string ":" value
@@ -67,7 +85,13 @@ class XJsonTransformer(Transformer):
     A Lark transformer to parse extended JSON.
     """
 
-    def __init__(self, input_string):
+    def __init__(self, input_string: str):
+        """
+        Parameters
+        ----------
+        input_string: str
+            The input string to parse.
+        """
         super().__init__()
         self.input_string = input_string
 
@@ -198,7 +222,7 @@ def _make_iterencode(
 
     def _iterencode(o):
         if isinstance(o, Reference):
-            yield "${" + o + "}"
+            yield str(o)
         elif isinstance(o, str):
             yield encoder(o)
         elif o is None:

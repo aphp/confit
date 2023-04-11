@@ -1,8 +1,6 @@
 # Confit
 
-Confit is a complete and easy-to-use configuration framework aimed at improving the reproducibility
-of experiments by relying on the Python typing system, minimal configuration files and
-command line interfaces.
+Confit is a complete and easy-to-use configuration framework aimed at improving the reproducibility of experiments by relying on the Python typing system, minimal configuration files and command line interfaces.
 
 ## Architecture
 
@@ -11,33 +9,32 @@ the [Pydantic](https://github.com/pydantic/pydantic) validation system and the [
 
 ### Registry
 
-The catalogue registry records the various components and layers that can be composed
-together to build a pipeline. Once registered, with the `registry.factory.register`
-decorator, these components are accessible as [entry points] and can be
+The catalogue registry records the various objects (classes or functions) that can be composed
+together to run your program. Once registered, with the `registry.factory.register`
+decorator, these objects are accessible as [entry points] and can be
 used in the configuration system.
-To start, you can create a simple registry with a single `"factory"` key as follows:
+To start, you can create a simple registry `"factory"` as follows:
 
 ```python
-from confit import Registry, set_default_registry
+from confit import Registry, RegistryCollection
 
 
-@set_default_registry
-class registry:
-    factory = Registry(("my_registry", "factory"), entry_points=True)
-
-    _catalogue = dict(
-        factory=factory,
-    )
+class registry(RegistryCollection):
+    factory = Registry(("my_library", "factory"), entry_points=True)
 ```
 
-!!! tip "And now what ?"
+!!! tip "What is this useful for?"
+
     With this registry, you can *register* a function or a class:
+
     ```python
     @registry.factory.register("my-function")
     def my_function(value=10):
         print(f"The value is {value}!")
     ```
-    Now you can retrieve the function from anywhere:
+
+    Now you can dynamically retrieve the function from anywhere:
+
     ```python
     func = registry.factory.get("my-function")
     func()
@@ -48,23 +45,18 @@ class registry:
 
 ### Typing system
 
-The Pydantic `validate_arguments` decorator enhances a function to automatically parse
-and validate its arguments every time it is called, using the Pydantic typing-based validation system.
-For instance, strings can be automatically cast as Path objects, or datetime or numbers
-depending on the type annotation of the argument.
+The Pydantic `validate_arguments` decorator enhances a function to automatically parse and validate its arguments every time it is called, using the Pydantic typing-based validation system.
+For instance, strings can be automatically cast as Path objects, or datetime or numbers depending on the type annotation of the argument.
 
-Combined with our configuration system, dictionaries passed as arguments to a decorated
-function can be "cast" as instantiated classes if these classes were them-selves decorated.
+Combined with our configuration system, dictionaries passed as arguments to a decorated function can be "cast" as instantiated classes if these classes were them-selves decorated.
 
 ### CLI
 
-...
+Documentation en cours
 
 ## The Config object
 
-The configuration object consists of a supercharged dict, the `Config` class, that can
-be used to read and write to `cfg` files, interpolate variables and instantiate components
-through the registry with some special `@factory` keys.
+The configuration object consists of a supercharged dict, the `Config` class, that can  be used to read and write to `cfg` files, interpolate variables and instantiate components  through the registry with some special `@factory` keys.
 A cfg file can be used directly as an input to a CLI-decorated function.
 
 We will show partial examples with increasing complexity below. See [here][a-simple-example] for an end-to-end example.
@@ -109,7 +101,7 @@ value3 = 10
 
 Here, `value2` will be set to 10.
 
-### Interpolating objects
+### Advanced interpolation
 
 You can even pass instantiated objects! Suppose we have a registered `myOtherClass` class expecting an instance of `MyClass` as input. You could use the following configuration:
 
@@ -139,7 +131,7 @@ class MyClass:
 +         self.hidden_value = 99
 ```
 
-To access those values directly in the configuration file, use the ${<obj:attribute>} syntax (notice the **colon** instead of the **point** mentionned [here][interpolating-values])
+To access those values directly in the configuration file, use the ${<obj:attribute>} syntax (notice the **colon** instead of the **point**)
 
 
 ```ini title="config.cfg"

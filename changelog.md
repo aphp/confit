@@ -1,5 +1,10 @@
 # Changelog
 
+# v0.2.1 - 11-05-2023
+
+- Fix un-allowed kwargs: accepted signatures are `fn(paramA, paramB=..., ... **kwargs)`
+
+
 # v0.2.0 - 05-04-2023
 
 - `Config.merge(...)` now only copies collections (not the underlying data) and doesn't split keys around dots

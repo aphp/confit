@@ -30,11 +30,13 @@ def _resolve_and_validate_call(
     parameters = signature.parameters
     bound_arguments = signature.bind_partial(*args, **kwargs)
     values = {}
-    for name, parameter in parameters.items():
-        if parameter.kind == parameter.VAR_KEYWORD:
-            values.update(bound_arguments.arguments[name])
-        elif name in bound_arguments.arguments:
-            values[name] = bound_arguments.arguments[name]
+    for name, value in bound_arguments.arguments.items():
+        param = parameters[name]
+        assert param.kind in (param.POSITIONAL_OR_KEYWORD, param.VAR_KEYWORD)
+        if param.kind == param.VAR_KEYWORD:
+            values.update(value)
+        else:
+            values[name] = value
 
     if use_self:
         resolved = values.pop("self")
@@ -66,7 +68,7 @@ def _check_signature_for_save_params(func: Callable):
     """
     spec = inspect.signature(func)
     if any(
-        param.kind == inspect.Parameter.VAR_POSITIONAL
+        param.kind not in (param.POSITIONAL_OR_KEYWORD, param.VAR_KEYWORD)
         for param in spec.parameters.values()
     ):
         raise SignatureError(func)

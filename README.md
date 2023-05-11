@@ -1,3 +1,9 @@
+![Tests](https://img.shields.io/github/actions/workflow/status/aphp/confit/tests.yml?branch=main&label=tests&style=flat-square)
+[![Documentation](https://img.shields.io/github/actions/workflow/status/aphp/confit/documentation.yml?branch=main&label=docs&style=flat-square)](https://aphp.github.io/confit/latest/)
+[![PyPI](https://img.shields.io/pypi/v/confit?color=blue&style=flat-square)](https://pypi.org/project/confit/)
+[![Codecov](https://img.shields.io/codecov/c/github/aphp/confit?logo=codecov&style=flat-square)](https://codecov.io/gh/aphp/confit)
+
+
 # Confit
 
 Confit is a complete and easy-to-use configuration framework aimed at improving the reproducibility
@@ -10,8 +16,8 @@ Install the library with pip:
 
 <div class="termy">
 
-```console
-$ pip install confit
+```bash
+pip install confit
 ```
 
 </div>
@@ -84,8 +90,8 @@ and run the following command from the terminal
 
 <div class="termy">
 
-```console
-$ python script.py --config config.cfg --seed 42
+```bash
+python script.py --config config.cfg --seed 42
 ```
 
 </div>
@@ -114,7 +120,7 @@ func(
 ```
 
 
-Visit the [documentation](https://datasciencetools-pages.eds.aphp.fr/confit) for more information!
+Visit the [documentation](https://aphp.github.io/confit/) for more information!
 
 ## Acknowledgement
 

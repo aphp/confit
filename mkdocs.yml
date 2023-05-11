@@ -1,6 +1,6 @@
 site_name: Confit
 
-repo_url: https://gitlab.eds.aphp.fr/datasciencetools/confit
+repo_url: https://github.com/aphp/confit
 # repo_name: algorithms/pseudonymisation
 
 theme:
@@ -51,10 +51,10 @@ watch:
 extra:
   alternate:
     - name: English
-      link: /en/
+      link: /confit/en/
       lang: en
     - name: Français
-      link: /fr/
+      link: /confit/fr/
       lang: fr
   version:
     provider: mike

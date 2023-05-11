@@ -63,7 +63,6 @@ coverage.xml
 *.xlsx
 *.pkl
 *.jpg
-*.png
 *.html
 *.pickle
 *.joblib

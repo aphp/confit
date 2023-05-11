@@ -126,7 +126,7 @@ class MyClass:
 +         self.hidden_value = 99
 ```
 
-Pour accéder à ces valeurs directement dans le fichier de configuration, utilisez la syntaxe ${<obj:attribut>} (remarquez les **deux points** au lieu du **point**)
+Pour accéder à ces valeurs directement dans le fichier de configuration, utilisez la syntaxe `${<obj:attribut>}` (remarquez les **deux points** au lieu du **point**)
 
 
 ```ini title="config.cfg"

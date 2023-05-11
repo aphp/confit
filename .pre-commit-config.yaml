@@ -39,6 +39,3 @@ repos:
       - id: interrogate
         args: ["--config=pyproject.toml"]
         pass_filenames: false
-        ignore-nested-functions: true
-        ignore-private: true
-        ignore-semiprivate: true

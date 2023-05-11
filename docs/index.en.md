@@ -52,7 +52,7 @@ Combined with our configuration system, dictionaries passed as arguments to a de
 
 ### CLI
 
-Documentation en cours
+TBD
 
 ## The Config object
 
@@ -131,7 +131,7 @@ class MyClass:
 +         self.hidden_value = 99
 ```
 
-To access those values directly in the configuration file, use the ${<obj:attribute>} syntax (notice the **colon** instead of the **point**)
+To access those values directly in the configuration file, use the `${<obj:attribute>}` syntax (notice the **colon** instead of the **point**)
 
 
 ```ini title="config.cfg"

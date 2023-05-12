@@ -19,7 +19,6 @@ theme:
   favicon: assets/logo/logo.png
   features:
     - navigation.tracking
-    - navigation.instant
     - navigation.indexes
     - content.code.annotate
 
@@ -51,10 +50,10 @@ watch:
 extra:
   alternate:
     - name: English
-      link: /confit/en/
+      link: ./en/
       lang: en
     - name: Français
-      link: /confit/fr/
+      link: ./fr/
       lang: fr
   version:
     provider: mike

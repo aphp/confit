@@ -1,5 +1,9 @@
 # Changelog
 
+# Pending
+
+- Allow passing configuration(s) directly to `@app.command()`
+
 # v0.2.1 - 11-05-2023
 
 - Fix un-allowed kwargs: accepted signatures are `fn(paramA, paramB=..., ... **kwargs)`

@@ -2,7 +2,7 @@ import datetime
 
 from typer.testing import CliRunner
 
-from confit import Cli, Registry
+from confit import Cli, Config, Registry
 from confit.registry import RegistryCollection, set_default_registry
 
 runner = CliRunner()
@@ -92,6 +92,56 @@ def test_cli_merge(change_test_dir):
     )
     assert result.exit_code == 0, result.stdout
     assert "Other: 99" in result.stdout
+
+
+app_with_initial_config = Cli(pretty_exceptions_show_locals=False)
+initial_config = [
+    Config(
+        {
+            "modelA": {
+                "submodel": {
+                    "value": 1,
+                }
+            },
+            "script": {
+                "other": 4,
+            },
+        }
+    ),
+    Config(
+        {
+            "script": {
+                "other": 5,
+            },
+        }
+    ),
+]
+
+
+@app_with_initial_config.command(name="script", config=initial_config)
+def app_with_initial_config_function(
+    modelA: BigModel,
+    modelB: BigModel,
+    other: int,
+    seed: int,
+):
+    assert modelA.submodel is modelB.submodel
+    assert modelA.submodel.value == 12  # --config has precedent over initial_config
+    assert other == 5  # initial_config[-1] has precedent over initial_config[0]
+
+
+def test_cli_working_with_initial_config(change_test_dir):
+    result = runner.invoke(
+        app_with_initial_config,
+        [
+            "--config",
+            "config.cfg",
+            "--seed",
+            "42",
+        ],
+    )
+    print(result.exit_code)
+    assert result.exit_code == 0, result.stdout
 
 
 app_with_meta = Cli(pretty_exceptions_show_locals=False)

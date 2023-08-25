@@ -59,6 +59,22 @@ ignore-regex = ['__(?!init).*__']
 color = true
 omit-covered-files = false
 
+[tool.coverage.report]
+exclude_also = [
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "@overload",
+    "pragma: no cover",
+    "raise .*Error",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+    "Span.set_extension.*",
+    "Doc.set_extension.*",
+    "Token.set_extension.*",
+]
+
 [tool.pytest.ini_options]
 testpaths = [
     "tests",

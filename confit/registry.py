@@ -306,11 +306,9 @@ class Registry(catalogue.Registry):
                 return from_entry_point
         namespace = list(self.namespace) + [name]
         if not catalogue.check_exists(*namespace):
-            current_namespace = " -> ".join(self.namespace)
-            available = ", ".join(sorted(self.get_available())) or "none"
             raise catalogue.RegistryError(
-                f"Can't find '{name}' in registry {current_namespace}. "
-                f"Available names: {available}"
+                f"Can't find '{name}' in registry { ' -> '.join(self.namespace)}. "
+                f"Available names: {', '.join(sorted(self.get_available())) or 'none'}"
             )
         return catalogue._get(namespace)
 

@@ -32,7 +32,6 @@ def _resolve_and_validate_call(
     values = {}
     for name, value in bound_arguments.arguments.items():
         param = parameters[name]
-        assert param.kind in (param.POSITIONAL_OR_KEYWORD, param.VAR_KEYWORD)
         if param.kind == param.VAR_KEYWORD:
             values.update(value)
         else:
@@ -68,7 +67,8 @@ def _check_signature_for_save_params(func: Callable):
     """
     spec = inspect.signature(func)
     if any(
-        param.kind not in (param.POSITIONAL_OR_KEYWORD, param.VAR_KEYWORD)
+        param.kind
+        not in (param.POSITIONAL_OR_KEYWORD, param.VAR_KEYWORD, param.KEYWORD_ONLY)
         for param in spec.parameters.values()
     ):
         raise SignatureError(func)

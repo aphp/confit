@@ -226,6 +226,9 @@ class Config(dict):
         """
         refs = {}
 
+        # Temp memory to avoid objects being garbage collected
+        mem = []
+
         def is_simple(o):
             return o is None or isinstance(o, (str, int, float, bool, Reference))
 
@@ -246,11 +249,13 @@ class Config(dict):
                 )
                 serialized = {k: rec(v, (*path, k)) for k, v in items}
                 serialized = {k: serialized[k] for k in o.keys()}
+                mem.append(o)
                 refs[id(o)] = Reference(join_path(path))
                 if isinstance(o, Config):
                     serialized = Config(serialized)
                 return serialized
             if isinstance(o, (list, tuple)):
+                mem.append(o)
                 refs[id(o)] = Reference(join_path(path))
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
             cfg = None
@@ -263,6 +268,7 @@ class Config(dict):
             except AttributeError:
                 pass
             if cfg is not None:
+                mem.append(o)
                 refs[id(o)] = Reference(join_path(path))
                 return rec(cfg, path)
             try:

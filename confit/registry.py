@@ -283,6 +283,37 @@ class Registry(catalogue.Registry):
         else:
             return wrap_and_register
 
+    def get(self, name: str) -> catalogue.InFunc:
+        """
+        Get the registered function for a given name.
+
+        Modified from catalogue.Registry.get to avoid importing
+        all entry points when lookup fails, but rather list the
+        available entry points.
+
+        Parameters
+        ----------
+        name: str
+            The name of the function
+
+        Returns
+        -------
+        catalogue.InFunc
+        """
+        if self.entry_points:
+            from_entry_point = self.get_entry_point(name)
+            if from_entry_point:
+                return from_entry_point
+        namespace = list(self.namespace) + [name]
+        if not catalogue.check_exists(*namespace):
+            current_namespace = " -> ".join(self.namespace)
+            available = ", ".join(sorted(self.get_available())) or "none"
+            raise catalogue.RegistryError(
+                f"Can't find '{name}' in registry {current_namespace}. "
+                f"Available names: {available}"
+            )
+        return catalogue._get(namespace)
+
     def get_available(self) -> Sequence[str]:
         """Get all functions for a given namespace.
 

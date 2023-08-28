@@ -129,6 +129,8 @@ class Cli(Typer):
                 try:
                     resolved_config = config.resolve(registry=registry)
                     default_seed = validated.model.__fields__.get("seed")
+                    if default_seed is not None:
+                        default_seed = default_seed.get_default()
                     seed = config.get(name, {}).get("seed", default_seed)
                     if seed is not None:
                         set_seed(seed)

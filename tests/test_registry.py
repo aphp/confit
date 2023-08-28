@@ -3,6 +3,7 @@ import inspect
 from typing import Any, Callable, Dict, Optional
 
 import catalogue
+import pytest
 from pytest import fixture
 
 from confit import Config, Registry
@@ -148,3 +149,13 @@ def test_default_config_invoker(registry):
         "@misc": "submodel",
         "value": 28.0,
     }
+
+
+def test_missing(registry):
+    with pytest.raises(catalogue.RegistryError) as e:
+        registry.misc.get("clearly_missing_function")
+
+    assert (
+        "Can't find 'clearly_missing_function' in registry mytest -> misc. "
+        "Available names:" in str(e.value)
+    )

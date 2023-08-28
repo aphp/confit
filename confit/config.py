@@ -3,13 +3,18 @@ import re
 from configparser import ConfigParser
 from io import StringIO
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence, Tuple, TypeVar, Union
+from typing import Any, Dict, List, Mapping, Tuple, TypeVar, Union
 from weakref import WeakKeyDictionary
 
 from pydantic import ValidationError
-from pydantic.error_wrappers import ErrorWrapper
 from pydantic.schema import encode_default
 
+from confit.errors import (
+    ConfitValidationError,
+    CyclicReferenceError,
+    MissingReference,
+    patch_errors,
+)
 from confit.utils.collections import flatten_sections, join_path, split_path
 from confit.utils.eval import safe_eval
 from confit.utils.xjson import Reference, dumps, loads
@@ -21,78 +26,6 @@ T = TypeVar("T")
 
 PATH_PART = r"(?:(?:'(?:[^\W0-9?][.\w]*)'|\"(?:[^\W0-9][.\w]*)\"|(?:[^\W0-9]\w*)))"
 PATH = rf"(?:(?:{PATH_PART}[.])*{PATH_PART})"
-
-
-def patch_errors(
-    errors: Union[Sequence[ErrorWrapper], ErrorWrapper],
-    path: Loc,
-):
-    """
-    Patch the location of the errors to add the `path` prefix.
-    This is useful when the errors are raised in a sub-dict of the config.
-
-    Parameters
-    ----------
-    errors: Union[Sequence[ErrorWrapper], ErrorWrapper]
-        The pydantic errors to patch
-    path: Loc
-        The path to add to the errors
-
-    Returns
-    -------
-    Union[Sequence[ErrorWrapper], ErrorWrapper]
-        The patched errors
-    """
-    if isinstance(errors, list):
-        res = []
-        for error in errors:
-            res.append(patch_errors(error, path))
-        return res
-    return ErrorWrapper(errors.exc, (*path, *errors.loc_tuple()))
-
-
-class MissingReference(Exception):
-    """
-    Raised when one or multiple references cannot be resolved.
-    """
-
-    def __init__(self, ref: Reference):
-        """
-        Parameters
-        ----------
-        ref: Reference
-            The reference that could not be resolved.
-        """
-        self.ref = ref
-        super().__init__()
-
-    def __str__(self):
-        """
-        String representation of the exception
-        """
-        return "Could not interpolate the following reference: {}".format(self.ref)
-
-
-class CyclicReferenceError(Exception):
-    """
-    Raised when a cyclic reference is detected.
-    """
-
-    def __init__(self, path: Loc):
-        """
-        Parameters
-        ----------
-        path: Loc
-            The path of the cyclic reference
-        """
-        self.path = path
-        super().__init__()
-
-    def __str__(self):
-        """
-        String representation of the exception
-        """
-        return "Cyclic reference detected at {}".format(join_path(self.path))
 
 
 class Config(dict):
@@ -418,7 +351,9 @@ class Config(dict):
                         # we need to do it here
                         Config._store_resolved(resolved, cfg)
                     except ValidationError as e:
-                        raise ValidationError(patch_errors(e.raw_errors, loc), e.model)
+                        raise ConfitValidationError(
+                            patch_errors(e.raw_errors, loc, params), e.model
+                        )
             elif isinstance(obj, list):
                 resolved = [rec(v, (*loc, i)) for i, v in enumerate(obj)]
             elif isinstance(obj, tuple):

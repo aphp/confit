@@ -1,6 +1,9 @@
 import pytest
+from pydantic import StrictBool, ValidationError
+from typing_extensions import Literal
 
 from confit import Registry
+from confit.errors import ConfitValidationError
 from confit.registry import RegistryCollection, SignatureError, validate_arguments
 
 
@@ -44,3 +47,70 @@ def test_validate_decorator():
 
     validated = validate_arguments()(GoodModel)
     assert validated("3").value == 3
+
+
+def test_literals():
+    @validate_arguments()
+    def test(val: Literal["ok", "ko"]):
+        return val
+
+    with pytest.raises(ConfitValidationError) as e:
+        test("not ok")
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_literals.<locals>.test()\n"
+        "-> val\n"
+        "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
+    )
+
+
+def test_fail_init():
+    @validate_arguments()
+    class SubModel:
+        def __init__(self, raise_attribute: bool, desc: str = ""):
+            self.desc = desc
+            if raise_attribute:
+                raise AttributeError("some_attribute")
+
+    @validate_arguments()
+    class Model:
+        def __init__(self, raise_attribute: StrictBool):
+            if raise_attribute:
+                self.sub = SubModel(raise_attribute)
+            else:
+                self.sub = SubModel()
+
+    @validate_arguments()
+    class BigModel:
+        def __init__(self, model: Model):
+            self.model = model
+
+    with pytest.raises(AttributeError) as e:
+        Model(raise_attribute=True)
+
+    with pytest.raises(ValidationError) as e:
+        Model(raise_attribute=False)
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+        "-> raise_attribute\n"
+        "   field required"
+    )
+
+    with pytest.raises(ValidationError) as e:
+        BigModel(model=dict(raise_attribute="ok"))
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+        "-> model.raise_attribute\n"
+        "   value is not a valid boolean, got 'ok' (str)"
+    )
+    repr(e)
+
+    with pytest.raises(ValidationError) as e:
+        BigModel(model=dict(raise_attribute=False))
+    # Nested error because we cannot merge the submodel error into the model error
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+        "-> model\n"
+        "   1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+        "   -> raise_attribute\n"
+        "      field required"
+    )

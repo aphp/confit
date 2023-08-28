@@ -73,7 +73,13 @@ def test_cli_missing(change_test_dir):
         ],
     )
     assert result.exit_code == 1
-    assert "Validation error" in result.stdout
+    assert str(result.stdout) == (
+        "Validation error: 2 validation errors for test_cli.function()\n"
+        "-> script.modelA.submodel\n"
+        "   field required\n"
+        "-> script.modelB\n"
+        "   field required\n"
+    )
 
 
 def test_cli_merge(change_test_dir):

@@ -3,9 +3,16 @@ from functools import wraps
 from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
 
 import catalogue
-import pydantic
+import pydantic.decorator
+from pydantic import ValidationError
+from pydantic.errors import PydanticErrorMixin
 
 from confit.config import Config
+from confit.errors import (
+    ConfitValidationError,
+    patch_errors,
+    remove_lib_from_traceback,
+)
 
 
 class SignatureError(TypeError):
@@ -19,6 +26,7 @@ def _resolve_and_validate_call(
     kwargs: Dict[str, Any],
     pydantic_func: Union[pydantic.decorator.ValidatedFunction, Callable],
     use_self: bool,
+    callee: Callable,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]],
 ) -> Any:
     returned = None
@@ -47,7 +55,32 @@ def _resolve_and_validate_call(
     def invoked(kw):
         nonlocal returned, resolved
         # "self" must be passed as a positional argument
-        returned = pydantic_func.call(*(resolved,) if use_self else (), **kw)
+        try:
+            returned = pydantic_func.call(*(resolved,) if use_self else (), **kw)
+        except ValidationError as e:
+            flat_errors = e.raw_errors
+            name = None
+            if e.model is pydantic_func.model:
+                name = callee.__module__ + "." + callee.__qualname__
+                flat_errors = patch_errors(
+                    errors=flat_errors,
+                    path=(),
+                    values=values,
+                    model=pydantic_func.model,
+                )
+            non_valid_errors = [
+                e for e in flat_errors if not isinstance(e.exc, PydanticErrorMixin)
+            ]
+            if name is None and hasattr(e.model, "type_"):
+                name = e.model.type_.__module__ + "." + e.model.type_.__qualname__
+            e = ConfitValidationError(
+                flat_errors,
+                model=e.model,
+                name=name,
+            )
+            if non_valid_errors:
+                raise e from non_valid_errors[0].exc
+            raise e from None
         if not use_self:
             resolved = returned
         return resolved
@@ -155,17 +188,26 @@ def validate_arguments(
             # This function is called when we do Model(variable=..., other=...)
             @wraps(vd.raw_function)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                return _resolve_and_validate_call(
-                    args=args,
-                    kwargs=kwargs,
-                    pydantic_func=vd,
-                    use_self=True,
-                    invoker=invoker,
-                )
+                try:
+                    return _resolve_and_validate_call(
+                        args=args,
+                        kwargs=kwargs,
+                        pydantic_func=vd,
+                        use_self=True,
+                        invoker=invoker,
+                        callee=_func,
+                    )
+                except ConfitValidationError as e:
+                    raise e.with_traceback(None) from None
+                except Exception as e:
+                    raise e.with_traceback(
+                        remove_lib_from_traceback(e.__traceback__)
+                    ) from None
 
             _func.vd = vd  # type: ignore
             _func.__get_validators__ = __get_validators__  # type: ignore
             _func.model = vd.model  # type: ignore
+            _func.model.type_ = _func  # type: ignore
             _func.__init__ = wrapper_function
             _func.__init__.raw_function = vd.raw_function  # type: ignore
             return _func
@@ -175,13 +217,21 @@ def validate_arguments(
 
             @wraps(_func)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                return _resolve_and_validate_call(
-                    args=args,
-                    kwargs=kwargs,
-                    pydantic_func=vd,
-                    use_self=False,
-                    invoker=invoker,
-                )
+                try:
+                    return _resolve_and_validate_call(
+                        args=args,
+                        kwargs=kwargs,
+                        pydantic_func=vd,
+                        use_self=False,
+                        invoker=invoker,
+                        callee=_func,
+                    )
+                except ConfitValidationError as e:
+                    raise e.with_traceback(None) from None
+                except Exception as e:
+                    raise e.with_traceback(
+                        remove_lib_from_traceback(e.__traceback__)
+                    ) from None
 
             wrapper_function.vd = vd  # type: ignore
             wrapper_function.validate = vd.init_model_instance  # type: ignore
@@ -307,7 +357,7 @@ class Registry(catalogue.Registry):
         namespace = list(self.namespace) + [name]
         if not catalogue.check_exists(*namespace):
             raise catalogue.RegistryError(
-                f"Can't find '{name}' in registry { ' -> '.join(self.namespace)}. "
+                f"Can't find '{name}' in registry {' -> '.join(self.namespace)}. "
                 f"Available names: {', '.join(sorted(self.get_available())) or 'none'}"
             )
         return catalogue._get(namespace)

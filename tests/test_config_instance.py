@@ -356,7 +356,8 @@ def test_type_hinted_instantiation_error():
     assert str(exc_info.value) == (
         "1 validation error for Function\n"
         "embedding -> value\n"
-        "  value is not a valid float (type=type_error.float)"
+        "  value is not a valid float, got 'ok' (str) (type=type_error.float; "
+        "actual_value='ok'; actual_type=str)"
     )
 
 
@@ -370,9 +371,9 @@ def test_factory_instantiation_error():
         """
         ).resolve(registry=registry)
     assert str(exc_info.value) == (
-        "1 validation error for SubModel\n"
-        "embedding -> value\n"
-        "  value is not a valid float (type=type_error.float)"
+        "1 validation error for SubModel()\n"
+        "-> embedding.value\n"
+        "   value is not a valid float, got 'ok' (str)"
     )
 
 

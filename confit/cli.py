@@ -3,12 +3,14 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
+import rich
 from pydantic import ValidationError
 from typer import Context, Typer, colors, secho
 from typer.core import TyperCommand
 from typer.models import CommandFunctionType, Default
 
 from .config import Config, merge_from_disk
+from .errors import patch_errors
 from .registry import validate_arguments
 from .utils.random import set_seed
 from .utils.xjson import loads
@@ -147,8 +149,13 @@ class Cli(Typer):
                     else:
                         return validated(**resolved_config.get(name, {}))
                 except ValidationError as e:
-                    print("\x1b[{}m{}\x1b[0m".format("38;5;1", "Validation error"))
-                    print(str(e))
+                    e.raw_errors = patch_errors(
+                        e.raw_errors,
+                        (name,),
+                    )
+                    console = rich.get_console()
+                    console.print("Validation error:", style="red", end=" ")
+                    console.print(str(e))
                     sys.exit(1)
 
             return validated

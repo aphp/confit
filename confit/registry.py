@@ -201,8 +201,6 @@ def validate_arguments(
                         invoker=invoker,
                         callee=_func,
                     )
-                except ConfitValidationError as e:
-                    raise e.with_traceback(None) from None
                 except Exception as e:
                     if not is_debug():
                         e.__cause__ = None
@@ -231,8 +229,6 @@ def validate_arguments(
                         invoker=invoker,
                         callee=_func,
                     )
-                except ConfitValidationError as e:
-                    raise e.with_traceback(None) from None
                 except Exception as e:
                     if not is_debug():
                         e.__cause__ = None

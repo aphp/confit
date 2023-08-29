@@ -165,10 +165,10 @@ def patch_errors(
         try:
             field_model = model
             for part in errors.loc_tuple():
-                if not issubclass(field_model, pydantic.BaseModel) and issubclass(
-                    field_model.vd.model, pydantic.BaseModel
-                ):
-                    field_model = field_model.vd.model
+                # if not issubclass(field_model, pydantic.BaseModel) and issubclass(
+                #     field_model.vd.model, pydantic.BaseModel
+                # ):
+                #     field_model = field_model.vd.model
                 field_model = field_model.__fields__[part].type_
             if (
                 field_model is errors.exc.model
@@ -177,7 +177,7 @@ def patch_errors(
                 return patch_errors(
                     errors.exc.raw_errors, (*path, *errors.loc_tuple()), values, model
                 )
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError):  # pragma: no cover
             pass
 
     if (

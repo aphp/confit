@@ -6,17 +6,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Tuple, TypeVar, Union
 from weakref import WeakKeyDictionary
 
-from pydantic import ValidationError
-from pydantic.schema import encode_default
+import pydantic_core
 
 from confit.errors import (
     ConfitValidationError,
     CyclicReferenceError,
     MissingReference,
     patch_errors,
+    remove_lib_from_traceback,
 )
 from confit.utils.collections import flatten_sections, join_path, split_path
 from confit.utils.eval import safe_eval
+from confit.utils.settings import is_debug
 from confit.utils.xjson import Reference, dumps, loads
 
 RESOLVED_TO_CONFIG = WeakKeyDictionary()
@@ -205,7 +206,7 @@ class Config(dict):
                 refs[id(o)] = Reference(join_path(path))
                 return rec(cfg, path)
             try:
-                return encode_default(o)
+                return pydantic_core.to_jsonable_python(o)
             except Exception:
                 raise TypeError(f"Cannot dump {o!r} at {join_path(path)}")
 
@@ -350,10 +351,17 @@ class Config(dict):
                         # but for components that are instantiated without it
                         # we need to do it here
                         Config._store_resolved(resolved, cfg)
-                    except ValidationError as e:
-                        raise ConfitValidationError(
-                            patch_errors(e.raw_errors, loc, params), e.model
-                        )
+                    except ConfitValidationError as e:
+                        e = ConfitValidationError(
+                            errors=patch_errors(e.raw_errors, loc, params),
+                            model=e.model,
+                            name=getattr(e, "name", None),
+                        ).with_traceback(remove_lib_from_traceback(e.__traceback__))
+                        if not is_debug():
+                            e.__cause__ = None
+                            e.__suppress_context__ = True
+                        raise e
+
             elif isinstance(obj, list):
                 resolved = [rec(v, (*loc, i)) for i, v in enumerate(obj)]
             elif isinstance(obj, tuple):

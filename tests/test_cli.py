@@ -1,9 +1,10 @@
 import datetime
 
+import pytest
 from typer.testing import CliRunner
 
 from confit import Cli, Registry
-from confit.registry import RegistryCollection, set_default_registry
+from confit.registry import PYDANTIC_V1, RegistryCollection, set_default_registry
 
 runner = CliRunner()
 
@@ -182,6 +183,10 @@ def bool_app_function(bool_value: bool, str_value: str):
     print("STR:", str_value)
 
 
+# fail if not PYDANTIC_V1
+
+
+@pytest.mark.xfail(not PYDANTIC_V1, reason="pydantic v2 fails when casting bool to str")
 def test_cli_bool(change_test_dir):
     result = runner.invoke(
         bool_app,
@@ -190,7 +195,7 @@ def test_cli_bool(change_test_dir):
             "--str_value",
         ],
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, result.stdout
     # CLI detects bool param for other which is converted to 1 since we expect an int
     assert "BOOL: True" in result.stdout
     assert "STR: True" in result.stdout

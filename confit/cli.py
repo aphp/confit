@@ -3,13 +3,12 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
-from pydantic import ValidationError
 from typer import Context, Typer, colors, secho
 from typer.core import TyperCommand
 from typer.models import CommandFunctionType, Default
 
 from .config import Config, merge_from_disk
-from .errors import patch_errors
+from .errors import ConfitValidationError, LegacyValidationError, patch_errors
 from .registry import validate_arguments
 from .utils.random import set_seed
 from .utils.settings import is_debug
@@ -110,15 +109,17 @@ class Cli(Typer):
                     config, name_from_file = merge_from_disk(config_path)
                 else:
                     config = Config({name: {}})
+                model_fields = (
+                    validated.model.model_fields
+                    if hasattr(validated.model, "model_fields")
+                    else validated.model.__fields__
+                )
                 for k, v in parse_overrides(ctx.args).items():
                     if "." not in k:
                         parts = (name, k)
                     else:
                         parts = k.split(".")
-                        if (
-                            parts[0] in validated.model.__fields__
-                            and parts[0] not in config
-                        ):
+                        if parts[0] in model_fields and parts[0] not in config:
                             parts = (name, *parts)
                     current = config
                     if parts[0] not in current:
@@ -130,7 +131,7 @@ class Cli(Typer):
                     current[parts[-1]] = v
                 try:
                     resolved_config = config.resolve(registry=registry)
-                    default_seed = validated.model.__fields__.get("seed")
+                    default_seed = model_fields.get("seed")
                     if default_seed is not None:
                         default_seed = default_seed.get_default()
                     seed = config.get(name, {}).get("seed", default_seed)
@@ -148,7 +149,7 @@ class Cli(Typer):
                         )
                     else:
                         return validated(**resolved_config.get(name, {}))
-                except ValidationError as e:
+                except (LegacyValidationError, ConfitValidationError) as e:
                     e.raw_errors = patch_errors(
                         e.raw_errors,
                         (name,),

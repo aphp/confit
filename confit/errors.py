@@ -1,15 +1,30 @@
 from textwrap import indent
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import pydantic
-from pydantic.error_wrappers import (
-    ErrorWrapper,
-    ValidationError,
-    get_exc_type,
-)
+
+from confit.utils.settings import is_debug
+
+try:
+    from pydantic.error_wrappers import (
+        ErrorWrapper,
+        get_exc_type,
+    )
+    from pydantic.error_wrappers import (
+        ValidationError as LegacyValidationError,
+    )
+    from pydantic.errors import PydanticErrorMixin
+except ImportError:
+    from pydantic.v1.error_wrappers import (
+        ErrorWrapper,
+        get_exc_type,
+    )
+    from pydantic.v1.error_wrappers import (
+        ValidationError as LegacyValidationError,
+    )
+    from pydantic.v1.errors import PydanticErrorMixin
 
 from confit.utils.collections import join_path
-from confit.utils.settings import is_debug
 from confit.utils.xjson import Reference
 
 Loc = Tuple[Union[int, str]]
@@ -77,9 +92,7 @@ def remove_lib_from_traceback(tb):
     return tb
 
 
-class ConfitValidationError(pydantic.ValidationError):
-    __slots__ = "raw_errors", "model", "_error_cache"
-
+class ConfitValidationError(LegacyValidationError):
     def __init__(
         self,
         errors: Sequence,
@@ -129,6 +142,47 @@ class ConfitValidationError(pydantic.ValidationError):
         return [("model", self.name), ("errors", self.errors())]
 
 
+class SignatureError(TypeError):
+    def __init__(self, func: Callable):
+        message = f"{func} must not have positional only args or duplicated kwargs"
+        super().__init__(message)
+
+
+class PydanticNewStyleError(PydanticErrorMixin, Exception):
+    msg_template = "{msg}"
+    code = "pydantic_new_style_error"
+
+
+def to_legacy_error(err: pydantic.ValidationError, model: Any) -> LegacyValidationError:
+    """
+    Decorator to convert a Pydantic ValidationError into a ConfitValidationError
+    """
+    if isinstance(err, LegacyValidationError):
+        return err
+    errors = err.errors(include_url=False)
+    raw_errors = []
+    for err in errors:
+        vrepr = repr(err["input"])
+        vrepr = vrepr[:50] + "..." if len(vrepr) > 50 else vrepr
+        err = dict(err)
+        msg = err.pop("msg", "")
+        msg = (msg[0].lower() + msg[1:]) if msg else msg
+        raw_errors.append(
+            ErrorWrapper(
+                exc=PydanticNewStyleError(
+                    **err,
+                    msg=msg,
+                    actual_value=vrepr,
+                    actual_type=type(err["input"]).__name__,
+                )
+                if "ctx" not in err or "error" not in err["ctx"]
+                else err["ctx"]["error"],
+                loc=err["loc"],
+            )
+        )
+    return ConfitValidationError(raw_errors, model=model)
+
+
 def patch_errors(
     errors: Union[Sequence[ErrorWrapper], ErrorWrapper],
     path: Loc,
@@ -161,7 +215,9 @@ def patch_errors(
         for error in errors:
             res.extend(patch_errors(error, path, values, model))
         return res
-    if isinstance(errors, ErrorWrapper) and isinstance(errors.exc, ValidationError):
+    if isinstance(errors, ErrorWrapper) and isinstance(
+        errors.exc, LegacyValidationError
+    ):
         try:
             field_model = model
             for part in errors.loc_tuple():
@@ -169,7 +225,14 @@ def patch_errors(
                 #     field_model.vd.model, pydantic.BaseModel
                 # ):
                 #     field_model = field_model.vd.model
-                field_model = field_model.__fields__[part].type_
+                if hasattr(field_model, "model_fields"):
+                    field_model = field_model.model_fields[part]
+                else:
+                    field_model = field_model.__fields__[part]
+                if hasattr(field_model, "type_"):
+                    field_model = field_model.type_
+                else:
+                    field_model = field_model.annotation
             if (
                 field_model is errors.exc.model
                 or field_model.vd.model is errors.exc.model
@@ -178,18 +241,22 @@ def patch_errors(
                     errors.exc.raw_errors, (*path, *errors.loc_tuple()), values, model
                 )
         except (KeyError, AttributeError):  # pragma: no cover
-            pass
+            print("Could not find model for", errors.loc_tuple())
 
     if (
-        isinstance(errors.exc, pydantic.errors.PydanticErrorMixin)
+        isinstance(errors.exc, PydanticErrorMixin)
         and values is not None
-        and "actual_value" not in errors.exc.__dict__
         and errors.loc_tuple()
         and errors.loc_tuple()[0] in values
     ):
-        actual_value = values
-        for key in errors.loc_tuple():
-            actual_value = actual_value[key]
+        if "actual_value" not in errors.exc.__dict__:
+            actual_value = values
+            for key in errors.loc_tuple():
+                actual_value = actual_value[key]
+            vrepr = repr(actual_value)
+            errors.exc.actual_value = vrepr[:50] + "..." if len(vrepr) > 50 else vrepr
+            errors.exc.actual_type = type(actual_value).__name__
+
         cls = errors.exc.__class__
         if cls not in PATCHED_ERRORS_CLS:
 
@@ -202,7 +269,7 @@ def patch_errors(
                 )
                 return s
 
-            PATCHED_ERRORS_CLS[cls] = type(
+            new_cls = type(
                 cls.__name__,
                 (cls,),
                 {
@@ -214,10 +281,9 @@ def patch_errors(
                     "__str__": error_str,
                 },
             )
+            PATCHED_ERRORS_CLS[cls] = new_cls
+            PATCHED_ERRORS_CLS[new_cls] = new_cls
         errors.exc.__class__ = PATCHED_ERRORS_CLS[cls]
-        vrepr = repr(actual_value)
-        errors.exc.actual_value = vrepr[:50] + "..." if len(vrepr) > 50 else vrepr
-        errors.exc.actual_type = type(actual_value).__name__
     return [
         ErrorWrapper(
             errors.exc,

@@ -1,12 +1,17 @@
 import os
 
 import pytest
-from pydantic import StrictBool, ValidationError
+from pydantic import StrictBool
 from typing_extensions import Literal
 
 from confit import Registry
 from confit.errors import ConfitValidationError
-from confit.registry import RegistryCollection, SignatureError, validate_arguments
+from confit.registry import (
+    PYDANTIC_V1,
+    RegistryCollection,
+    SignatureError,
+    validate_arguments,
+)
 
 
 class registry(RegistryCollection):
@@ -58,11 +63,18 @@ def test_literals():
 
     with pytest.raises(ConfitValidationError) as e:
         test("not ok")
-    assert str(e.value) == (
-        "1 validation error for test_validate.test_literals.<locals>.test()\n"
-        "-> val\n"
-        "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
-    )
+    if PYDANTIC_V1:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_literals.<locals>.test()\n"
+            "-> val\n"
+            "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
+        )
+    else:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_literals.<locals>.test()\n"
+            "-> val\n"
+            "   input should be 'ok' or 'ko', got 'not ok' (str)"
+        )
 
 
 def test_fail_init():
@@ -89,24 +101,38 @@ def test_fail_init():
     with pytest.raises(AttributeError) as e:
         Model(raise_attribute=True)
 
-    with pytest.raises(ValidationError) as e:
+    with pytest.raises(ConfitValidationError) as e:
         Model(raise_attribute=False)
-    assert str(e.value) == (
-        "1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
-        "-> raise_attribute\n"
-        "   field required"
-    )
+    if PYDANTIC_V1:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+            "-> raise_attribute\n"
+            "   field required"
+        )
+    else:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+            "-> raise_attribute\n"
+            "   field required"
+        )
 
-    with pytest.raises(ValidationError) as e:
+    with pytest.raises(ConfitValidationError) as e:
         BigModel(model=dict(raise_attribute="ok"))
-    assert str(e.value) == (
-        "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
-        "-> model.raise_attribute\n"
-        "   value is not a valid boolean, got 'ok' (str)"
-    )
+    if PYDANTIC_V1:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+            "-> model.raise_attribute\n"
+            "   value is not a valid boolean, got 'ok' (str)"
+        )
+    else:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+            "-> model.raise_attribute\n"
+            "   input should be a valid boolean, got 'ok' (str)"
+        )
     repr(e)
 
-    with pytest.raises(ValidationError) as e:
+    with pytest.raises(ConfitValidationError) as e:
         BigModel(model=dict(raise_attribute=False))
     # Nested error because we cannot merge the submodel error into the model error
     assert str(e.value) == (
@@ -128,10 +154,17 @@ def test_debug():
 
         with pytest.raises(ConfitValidationError) as e:
             test("not ok")
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_debug.<locals>.test()\n"
-            "-> val\n"
-            "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
-        )
+        if PYDANTIC_V1:
+            assert str(e.value) == (
+                "1 validation error for test_validate.test_debug.<locals>.test()\n"
+                "-> val\n"
+                "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
+            )
+        else:
+            assert str(e.value) == (
+                "1 validation error for test_validate.test_debug.<locals>.test()\n"
+                "-> val\n"
+                "   input should be 'ok' or 'ko', got 'not ok' (str)"
+            )
     finally:
         os.environ.pop("CONFIT_DEBUG", None)

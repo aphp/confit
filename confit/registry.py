@@ -220,9 +220,14 @@ def validate_arguments(
                     [
                         core_schema.no_info_plain_validator_function(pre_validate),
                         *(
-                            old_get_pydantic_core_schema(*args, **kwargs)
+                            (old_get_pydantic_core_schema(*args, **kwargs),)
                             if old_get_pydantic_core_schema
-                            else []
+                            else (
+                                core_schema.no_info_plain_validator_function(fn)
+                                for fn in old_get_validators()
+                            )
+                            if old_get_validators is not None
+                            else ()
                         ),
                         core_schema.no_info_plain_validator_function(post_validate),
                     ]

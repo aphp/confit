@@ -56,6 +56,71 @@ def test_validate_decorator():
     assert validated("3").value == 3
 
 
+def test_custom_validators_v1():
+    @validate_arguments()
+    class ModelWithCustomValidation:
+        def __init__(self, value: float, desc: str = ""):
+            self.value = value
+            self.desc = desc
+
+        @classmethod
+        def validate(cls, value: float):
+            if isinstance(value, dict):
+                value["desc"] = "Custom validation done"
+                return value
+
+        @classmethod
+        def __get_validators__(cls):
+            yield cls.validate
+
+    @validate_arguments()
+    def fn(value: ModelWithCustomValidation):
+        return value.desc
+
+    assert (
+        fn(
+            value=dict(
+                value=3,
+            )
+        )
+        == "Custom validation done"
+    )
+
+
+@pytest.mark.xfail(PYDANTIC_V1, reason="API not compatible with Pydantic v1")
+def test_custom_validators_v2():
+    @validate_arguments()
+    class ModelWithCustomValidation:
+        def __init__(self, value: float, desc: str = ""):
+            self.value = value
+            self.desc = desc
+
+        @classmethod
+        def validate(cls, value: float):
+            if isinstance(value, dict):
+                value["desc"] = "Custom validation done"
+                return value
+
+        @classmethod
+        def __get_pydantic_core_schema__(cls, *args, **kwargs):
+            from pydantic_core import core_schema
+
+            return core_schema.no_info_plain_validator_function(cls.validate)
+
+    @validate_arguments()
+    def fn(value: ModelWithCustomValidation):
+        return value.desc
+
+    assert (
+        fn(
+            value=dict(
+                value=3,
+            )
+        )
+        == "Custom validation done"
+    )
+
+
 def test_literals():
     @validate_arguments()
     def test(val: Literal["ok", "ko"]):

@@ -12,6 +12,7 @@ from .config import Config, merge_from_disk
 from .errors import patch_errors
 from .registry import validate_arguments
 from .utils.random import set_seed
+from .utils.settings import is_debug
 from .utils.xjson import loads
 
 
@@ -152,13 +153,15 @@ class Cli(Typer):
                         e.raw_errors,
                         (name,),
                     )
+                    if is_debug():
+                        raise e
                     try:
                         import rich
 
                         console = rich.console.Console(stderr=True)
                         console.print("Validation error:", style="red", end=" ")
                         console.print(str(e))
-                    except ImportError:
+                    except ImportError:  # pragma: no cover
                         print("Validation error:", file=sys.stderr, end=" ")
                         print(str(e), file=sys.stderr)
                     sys.exit(1)

@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from pydantic import StrictBool, ValidationError
 from typing_extensions import Literal
@@ -114,3 +116,22 @@ def test_fail_init():
         "   -> raise_attribute\n"
         "      field required"
     )
+
+
+def test_debug():
+    try:
+        os.environ["CONFIT_DEBUG"] = "true"
+
+        @validate_arguments()
+        def test(val: Literal["ok", "ko"]):
+            return val
+
+        with pytest.raises(ConfitValidationError) as e:
+            test("not ok")
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_debug.<locals>.test()\n"
+            "-> val\n"
+            "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
+        )
+    finally:
+        os.environ.pop("CONFIT_DEBUG", None)

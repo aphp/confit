@@ -3,7 +3,6 @@ import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
-import rich
 from pydantic import ValidationError
 from typer import Context, Typer, colors, secho
 from typer.core import TyperCommand
@@ -153,9 +152,15 @@ class Cli(Typer):
                         e.raw_errors,
                         (name,),
                     )
-                    console = rich.get_console()
-                    console.print("Validation error:", style="red", end=" ")
-                    console.print(str(e))
+                    try:
+                        import rich
+
+                        console = rich.console.Console(stderr=True)
+                        console.print("Validation error:", style="red", end=" ")
+                        console.print(str(e))
+                    except ImportError:
+                        print("Validation error:", file=sys.stderr, end=" ")
+                        print(str(e), file=sys.stderr)
                     sys.exit(1)
 
             return validated

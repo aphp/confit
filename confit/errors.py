@@ -9,6 +9,7 @@ from pydantic.error_wrappers import (
 )
 
 from confit.utils.collections import join_path
+from confit.utils.settings import is_debug
 from confit.utils.xjson import Reference
 
 Loc = Tuple[Union[int, str]]
@@ -66,6 +67,8 @@ def remove_lib_from_traceback(tb):
     Remove the lib folder from the traceback
     """
     # compare package to module in f_globals
+    if is_debug():
+        return tb
     if tb is not None and tb.tb_frame.f_globals.get("__package__") == __package__:
         return remove_lib_from_traceback(tb.tb_next)
     if tb is None or tb.tb_next is None:

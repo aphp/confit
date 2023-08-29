@@ -13,6 +13,7 @@ from confit.errors import (
     patch_errors,
     remove_lib_from_traceback,
 )
+from confit.utils.settings import is_debug
 
 
 class SignatureError(TypeError):
@@ -80,7 +81,10 @@ def _resolve_and_validate_call(
             )
             if non_valid_errors:
                 raise e from non_valid_errors[0].exc
-            raise e from None
+            if not is_debug():
+                e.__cause__ = None
+                e.__suppress_context__ = True
+            raise e
         if not use_self:
             resolved = returned
         return resolved
@@ -200,9 +204,10 @@ def validate_arguments(
                 except ConfitValidationError as e:
                     raise e.with_traceback(None) from None
                 except Exception as e:
-                    raise e.with_traceback(
-                        remove_lib_from_traceback(e.__traceback__)
-                    ) from None
+                    if not is_debug():
+                        e.__cause__ = None
+                        e.__suppress_context__ = True
+                    raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
             _func.vd = vd  # type: ignore
             _func.__get_validators__ = __get_validators__  # type: ignore
@@ -229,9 +234,10 @@ def validate_arguments(
                 except ConfitValidationError as e:
                     raise e.with_traceback(None) from None
                 except Exception as e:
-                    raise e.with_traceback(
-                        remove_lib_from_traceback(e.__traceback__)
-                    ) from None
+                    if not is_debug():
+                        e.__cause__ = None
+                        e.__suppress_context__ = True
+                    raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
             wrapper_function.vd = vd  # type: ignore
             wrapper_function.validate = vd.init_model_instance  # type: ignore

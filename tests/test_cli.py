@@ -71,14 +71,15 @@ def test_cli_missing(change_test_dir):
             "--seed",
             "42",
         ],
+        env={"CONFIT_DEBUG": "true"},
     )
     assert result.exit_code == 1
-    assert str(result.stdout) == (
-        "Validation error: 2 validation errors for test_cli.function()\n"
+    assert str(result.exception) == (
+        "2 validation errors for test_cli.function()\n"
         "-> script.modelA.submodel\n"
         "   field required\n"
         "-> script.modelB\n"
-        "   field required\n"
+        "   field required"
     )
 
 

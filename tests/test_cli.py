@@ -60,7 +60,7 @@ def test_cli_working(change_test_dir):
     assert "Other: 4" in result.stdout
 
 
-def test_cli_missing(change_test_dir):
+def test_cli_missing_debug(change_test_dir):
     result = runner.invoke(
         app,
         [
@@ -81,6 +81,28 @@ def test_cli_missing(change_test_dir):
         "-> script.modelB\n"
         "   field required"
     )
+
+
+def test_cli_missing_no_debug(change_test_dir):
+    result = runner.invoke(
+        app,
+        [
+            "--modelA.date",
+            "2010-10-10",
+            "--other",
+            "4",
+            "--seed",
+            "42",
+        ],
+    )
+    assert result.exit_code == 1
+    assert (
+        "2 validation errors for test_cli.function()\n"
+        "-> script.modelA.submodel\n"
+        "   field required\n"
+        "-> script.modelB\n"
+        "   field required"
+    ) in str(result.stdout)
 
 
 def test_cli_merge(change_test_dir):

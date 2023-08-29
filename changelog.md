@@ -1,17 +1,23 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 - 29-08-2023
 
 ### Added
 
 - Improve validation errors merging and display. By default, confit related frames and exception causes
   in the traceback are hidden.
 - Show inner-confit traceback and exception chains if `CONFIT_DEBUG` env var is true
-- Support for both Pydantic v2 and V1
+- Support for both Pydantic v2 and v1
 
 ### Fixed
 
 - If the `seed` is given a default value in CLI, it can now be used by confit when no seed is given
+
+## v0.3.0 - 25-08-2023
+
+- Allow keyword only parameters
+- Avoid import of all entry points by catalogue during failed registry lookup
+- Fix bug in serialization, leading to mixed config fields
 
 ## v0.2.1 - 11-05-2023
 

@@ -2,7 +2,7 @@
 name = "confit"
 description = "Smart configuration framework"
 authors = [
-    { name = "Perceval Wajsburt", email = "perceval.wajsburt-ext@aphp.fr" },
+    { name = "Perceval Wajsburt", email = "perceval.wajsburt@aphp.fr" },
     { name = "Thomas Petit-Jean", email = "thomas.petitjean@aphp.fr" },
     { name = "Adam Remaki", email = "adam.remaki@aphp.fr" },
     { name = "Alice Calliger", email = "alice.calliger@aphp.fr" }

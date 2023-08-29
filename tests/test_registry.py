@@ -159,3 +159,11 @@ def test_missing(registry):
         "Can't find 'clearly_missing_function' in registry mytest -> misc. "
         "Available names:" in str(e.value)
     )
+
+
+def test_cannot_store(registry):
+    @registry.misc.register("unstorable")
+    def return_none():
+        return None
+
+    return_none()

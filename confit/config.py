@@ -491,7 +491,10 @@ class Config(dict):
         resolved: Any
         config: Config
         """
-        RESOLVED_TO_CONFIG[resolved] = config
+        try:
+            RESOLVED_TO_CONFIG[resolved] = config
+        except TypeError:
+            pass
 
 
 def merge_from_disk(

@@ -50,12 +50,13 @@ class BigModel:
         self.submodel = submodel
  
 + app = Cli(pretty_exceptions_show_locals=False)
- 
+
+# you can use @confit.validate_arguments instead if you don't plan on using the CLI
 + @app.command(name="script", registry=registry)
-def func(modelA: BigModel, modelB: BigModel, other: int, seed: int):
+def func(modelA: BigModel, modelB: BigModel, seed: int = 42):
     assert modelA.submodel is modelB.submodel
-    assert modelA.date == datetime.date(2010, 10, 10)
-    print("Other:", other)
+    print("modelA.date:", modelA.date.strftime("%B %-d, %Y"))
+    print("modelB.date:", modelB.date.strftime("%B %-d, %Y"))
  
 + if __name__ == "__main__":
 +     app()
@@ -91,7 +92,7 @@ and run the following command from the terminal
 <div class="termy">
 
 ```bash
-python script.py --config config.cfg --seed 42
+python script.py --config config.cfg --seed 43
 ```
 
 </div>
@@ -109,15 +110,68 @@ seed = 42
 set_seed(seed)
 
 submodel = SubModel(value=12)
-# BigModel will cast date strings as datetime.date objects
-modelA = BigModel(date="2003-02-01", submodel=submodel)
-modelB = BigModel(date="2003-04-05", submodel=submodel)
 func(
-    modelA=modelA,
-    modelB=modelA,
+    # BigModel will cast date strings as datetime.date objects
+    modelA=BigModel(date="2003-02-01", submodel=submodel),
+    # Since the modelB argument was typed, the dict is cast as a BigModel instance
+    modelB=dict(date="2003-04-05", submodel=submodel),
     seed=seed,
 )
 ```
+
+```
+modelA.date: February 1, 2003
+modelB.date: April 5, 2003
+```
+
+#### Serialization
+
+You can also serialize registered classes, while keeping references between instances:
+
+```python
+from confit import Config
+
+submodel = SubModel(value=12)
+modelA = BigModel(date="2003-02-01", submodel=submodel)
+modelB = BigModel(date="2003-02-01", submodel=submodel)
+print(Config({"modelA": modelA, "modelB": modelB}).to_str())
+```
+
+```ini
+[modelA]
+@factory = "bigmodel"
+date = "2003-02-01"
+
+[modelA.submodel]
+@factory = "submodel"
+value = 12
+
+[modelB]
+@factory = "bigmodel"
+date = "2003-02-01"
+submodel = ${modelA.submodel}
+```
+
+#### Error handling
+
+You also benefit from informative validation errors:
+
+```python
+func(
+    modelA=dict(date="hello", submodel=dict(value=3)),
+    modelB=dict(date="2010-10-05", submodel=dict(value="hi")),
+)
+```
+
+```
+ConfitValidationError: 2 validation errors for __main__.func()
+-> modelA.date
+   invalid date format, got 'hello' (str)
+-> modelB.submodel.value
+   value is not a valid float, got 'hi' (str)
+```
+
+
 
 
 Visit the [documentation](https://aphp.github.io/confit/) for more information!

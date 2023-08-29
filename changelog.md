@@ -1,11 +1,23 @@
 # Changelog
 
-# v0.2.1 - 11-05-2023
+## Unreleased
+
+### Added
+
+- Improve validation errors merging and display. By default, confit related frames and exception causes
+  in the traceback are hidden.
+- Show inner-confit traceback and exception chains if `CONFIT_DEBUG` env var is true
+
+### Fixed
+
+- If the `seed` is given a default value in CLI, it can now be used by confit when no seed is given
+
+## v0.2.1 - 11-05-2023
 
 - Fix un-allowed kwargs: accepted signatures are `fn(paramA, paramB=..., ... **kwargs)`
 
 
-# v0.2.0 - 05-04-2023
+## v0.2.0 - 05-04-2023
 
 - `Config.merge(...)` now only copies collections (not the underlying data) and doesn't split keys around dots
 - `__path__` option has been removed (having a override_structure in .to_str() would be better)
@@ -15,7 +27,7 @@
 - Add the `invoker` option to `.register(...)` to modify the arguments of the call to the registered function or do something with the result
 - User defined `class registry` should now inherit from `RegistryCollection`
 
-# v0.1.5 - 02-03-2023
+## v0.1.5 - 02-03-2023
 
 - Verify the signature when registering rather than during a call
 - Allow `**kwargs`

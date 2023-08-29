@@ -1,5 +1,6 @@
 import inspect
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
@@ -76,6 +77,7 @@ class Cli(Typer):
         # Rich settings
         rich_help_panel: Union[str, None] = Default(None),
         registry: Any = None,
+        config: Optional[Union[Config, List[Config]]] = None,
     ) -> Callable[[CommandFunctionType], CommandFunctionType]:
         typer_command = super().command(
             name=name,
@@ -96,14 +98,35 @@ class Cli(Typer):
             },
         )
 
+        initial_config = config
+
         def wrapper(fn):
             validated = validate_arguments(fn)
 
             @typer_command
             def command(ctx: Context, config: Optional[List[Path]] = None):
-                config_path = config
+                config_path = config or []
 
                 has_meta = _fn_has_meta(fn)
+
+                if initial_config is not None:
+                    initial_configs = (
+                        [initial_config]
+                        if isinstance(initial_config, Config)
+                        else initial_config
+                    )
+
+                    initial_config_path = []
+
+                    for c in initial_configs:
+                        temp_file = tempfile.NamedTemporaryFile(delete=False)
+                        temp_file.write(
+                            c.to_str().encode()
+                        )  # Write the string to the file
+                        temp_file.close()
+                        initial_config_path.append(Path(temp_file.name))
+                    config_path = initial_config_path + config_path
+
                 if config_path:
                     config, name_from_file = merge_from_disk(config_path)
                 else:

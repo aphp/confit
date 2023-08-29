@@ -3,29 +3,34 @@ from functools import wraps
 from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
 
 import catalogue
-import pydantic.decorator
+import pydantic
+
+from confit.utils.settings import is_debug
+
+try:
+    from pydantic.decorator import ValidatedFunction
+except ImportError:
+    from pydantic.deprecated.decorator import ValidatedFunction
 from pydantic import ValidationError
-from pydantic.errors import PydanticErrorMixin
 
 from confit.config import Config
 from confit.errors import (
     ConfitValidationError,
+    LegacyValidationError,
+    PydanticErrorMixin,
+    SignatureError,
     patch_errors,
     remove_lib_from_traceback,
+    to_legacy_error,
 )
-from confit.utils.settings import is_debug
 
-
-class SignatureError(TypeError):
-    def __init__(self, func: Callable):
-        message = f"{func} must not have positional only args or duplicated kwargs"
-        super().__init__(message)
+PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
 
 
 def _resolve_and_validate_call(
     args: Sequence[Any],
     kwargs: Dict[str, Any],
-    pydantic_func: Union[pydantic.decorator.ValidatedFunction, Callable],
+    pydantic_func: Union[ValidatedFunction, Callable],
     use_self: bool,
     callee: Callable,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]],
@@ -58,7 +63,8 @@ def _resolve_and_validate_call(
         # "self" must be passed as a positional argument
         try:
             returned = pydantic_func.call(*(resolved,) if use_self else (), **kw)
-        except ValidationError as e:
+        except (ValidationError, LegacyValidationError) as e:
+            e = to_legacy_error(e, pydantic_func.model)
             flat_errors = e.raw_errors
             name = None
             if e.model is pydantic_func.model:
@@ -145,24 +151,30 @@ def validate_arguments(
         if isinstance(_func, type):
             _func: type
             if hasattr(_func.__init__, "raw_function"):
-                vd = pydantic.decorator.ValidatedFunction(
-                    _func.__init__.raw_function, config
-                )
+                vd = ValidatedFunction(_func.__init__.raw_function, config)
             else:
-                vd = pydantic.decorator.ValidatedFunction(_func.__init__, config)
+                vd = ValidatedFunction(_func.__init__, config)
             vd.model.__name__ = _func.__name__
-            vd.model.__fields__["self"].required = False
-
-            # Should we store the generator instead ?
-            existing_validators = (
-                list(_func.__get_validators__())
-                if hasattr(_func, "__get_validators__")
-                else []
-            )
+            if hasattr(vd.model, "model_fields"):
+                vd.model.model_fields["self"].default = None
+            else:
+                vd.model.__fields__["self"].default = None
 
             # This function is called by Pydantic when asked to cast
             # a value (most likely a dict) as a Model (most often during
             # a function call)
+
+            old_get_validators = (
+                _func.__get_validators__
+                if hasattr(_func, "__get_validators__")
+                else None
+            )
+            old_get_pydantic_core_schema = (
+                _func.__get_pydantic_core_schema__
+                if hasattr(_func, "__get_pydantic_core_schema__")
+                else None
+            )
+
             def __get_validators__():
                 """
                 This function is called by Pydantic when asked to cast
@@ -179,8 +191,9 @@ def validate_arguments(
                     if isinstance(value, dict):
                         value = Config(value).resolve(registry=registry)
 
-                    for validator in existing_validators:
-                        value = validator(value)
+                    if old_get_validators is not None:
+                        for validator in old_get_validators():
+                            value = validator(value)
 
                     if isinstance(value, _func):
                         return value
@@ -188,6 +201,32 @@ def validate_arguments(
                     return _func(**value)
 
                 yield _validate
+
+            def __get_pydantic_core_schema__(*args, **kwargs):
+                from pydantic_core import core_schema
+
+                def pre_validate(value):
+                    if isinstance(value, dict):
+                        value = Config(value).resolve(registry=registry)
+                    return value
+
+                def post_validate(value):
+                    if isinstance(value, _func):
+                        return value
+
+                    return _func(**value)
+
+                return core_schema.chain_schema(
+                    [
+                        core_schema.no_info_plain_validator_function(pre_validate),
+                        *(
+                            old_get_pydantic_core_schema(*args, **kwargs)
+                            if old_get_pydantic_core_schema
+                            else []
+                        ),
+                        core_schema.no_info_plain_validator_function(post_validate),
+                    ]
+                )
 
             # This function is called when we do Model(variable=..., other=...)
             @wraps(vd.raw_function)
@@ -209,6 +248,9 @@ def validate_arguments(
 
             _func.vd = vd  # type: ignore
             _func.__get_validators__ = __get_validators__  # type: ignore
+            _func.__get_pydantic_core_schema__ = (
+                __get_pydantic_core_schema__  # type: ignore
+            )
             _func.model = vd.model  # type: ignore
             _func.model.type_ = _func  # type: ignore
             _func.__init__ = wrapper_function
@@ -216,7 +258,7 @@ def validate_arguments(
             return _func
 
         else:
-            vd = pydantic.decorator.ValidatedFunction(_func, config)
+            vd = ValidatedFunction(_func, config)
 
             @wraps(_func)
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:

@@ -7,6 +7,7 @@
 - Improve validation errors merging and display. By default, confit related frames and exception causes
   in the traceback are hidden.
 - Show inner-confit traceback and exception chains if `CONFIT_DEBUG` env var is true
+- Support for both Pydantic v2 and V1
 
 ### Fixed
 

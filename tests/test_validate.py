@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import pytest
@@ -139,6 +140,27 @@ def test_literals():
             "1 validation error for test_validate.test_literals.<locals>.test()\n"
             "-> val\n"
             "   input should be 'ok' or 'ko', got 'not ok' (str)"
+        )
+
+
+def test_dates():
+    @validate_arguments()
+    def test(val: datetime.datetime):
+        return val
+
+    with pytest.raises(ConfitValidationError) as e:
+        test("hello")
+    if PYDANTIC_V1:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_dates.<locals>.test()\n"
+            "-> val\n"
+            "   invalid datetime format, got 'hello' (str)"
+        )
+    else:
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_dates.<locals>.test()\n"
+            "-> val\n"
+            "   input should be a valid datetime, input is too short, got 'hello' (str)"
         )
 
 

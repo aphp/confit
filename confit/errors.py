@@ -169,14 +169,16 @@ def to_legacy_error(err: pydantic.ValidationError, model: Any) -> LegacyValidati
         msg = (msg[0].lower() + msg[1:]) if msg else msg
         raw_errors.append(
             ErrorWrapper(
-                exc=PydanticNewStyleError(
+                exc=err["ctx"]["error"]
+                if "ctx" in err
+                and "error" in err["ctx"]
+                and isinstance(err["ctx"]["error"], BaseException)
+                else PydanticNewStyleError(
                     **err,
                     msg=msg,
                     actual_value=vrepr,
                     actual_type=type(err["input"]).__name__,
-                )
-                if "ctx" not in err or "error" not in err["ctx"]
-                else err["ctx"]["error"],
+                ),
                 loc=err["loc"],
             )
         )

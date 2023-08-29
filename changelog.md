@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.1 - 29-08-2023
+
+### Fixed
+
+- Use pydantic v2 context error only if it is an exception
+
 ## v0.4.0 - 29-08-2023
 
 ### Added

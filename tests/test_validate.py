@@ -42,10 +42,14 @@ def test_fail_args():
 
     assert "positional only args or duplicated kwargs" in str(e.value)
 
-    with pytest.raises(TypeError) as e:
+    with pytest.raises(ConfitValidationError) as e:
         GoodModel(3, value=4)
 
-    assert str(e.value) == "multiple values for argument 'value'"
+    assert str(e.value) == (
+        "1 validation error for test_validate.GoodModel()\n"
+        "-> [signature]\n"
+        "   multiple values for argument: 'value'"
+    )
 
 
 def test_validate_decorator():
@@ -255,3 +259,68 @@ def test_debug():
             )
     finally:
         os.environ.pop("CONFIT_DEBUG", None)
+
+
+def test_extra_arg():
+    @validate_arguments()
+    def func(val: Literal["ok", "ko"]):
+        return val
+
+    with pytest.raises(ConfitValidationError) as e:
+        func("ok", extra="extra")
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_extra_arg.<locals>.func()\n"
+        "-> extra\n"
+        "   unexpected keyword argument"
+    )
+
+
+def test_deep_extra():  # from pydantic import validate_arguments
+    @validate_arguments
+    class Model:
+        def __init__(self, a, b):
+            print(a, b)
+
+    @validate_arguments
+    def func(val: Model):
+        print(val)
+
+    with pytest.raises(ConfitValidationError) as e:
+        func(val={"c": 3, "d": 4})
+
+    if PYDANTIC_V1:
+        assert str(e.value) == (
+            "4 validation errors for test_validate.test_deep_extra.<locals>.func()\n"
+            "-> val.a\n"
+            "   field required\n"
+            "-> val.b\n"
+            "   field required\n"
+            "-> val.c\n"
+            "   unexpected keyword argument\n"
+            "-> val.d\n"
+            "   unexpected keyword argument"
+        )
+    else:
+        # For some reason, pydantic v2 models abort the validation in case of
+        # unexpected fields, so we only get 2 errors instead of 4
+        assert str(e.value) == (
+            "2 validation errors for test_validate.test_deep_extra.<locals>.func()\n"
+            "-> val.c\n"
+            "   unexpected keyword argument\n"
+            "-> val.d\n"
+            "   unexpected keyword argument"
+        )
+
+
+def test_duplicated_arg():
+    @validate_arguments()
+    def func(val: Literal["ok", "ko"]):
+        return val
+
+    with pytest.raises(ConfitValidationError) as e:
+        func("ok", val="ko")
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_duplicated_arg.<locals>.func()\n"
+        "-> [signature]\n"
+        "   multiple values for argument: 'val'"
+    )

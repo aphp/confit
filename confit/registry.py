@@ -1,6 +1,6 @@
 import inspect
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, Sequence, TypeVar
 
 import catalogue
 import pydantic
@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from confit.config import Config
 from confit.errors import (
     ConfitValidationError,
+    ErrorWrapper,
     LegacyValidationError,
     PydanticErrorMixin,
     SignatureError,
@@ -30,29 +31,13 @@ PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
 def _resolve_and_validate_call(
     args: Sequence[Any],
     kwargs: Dict[str, Any],
-    pydantic_func: Union[ValidatedFunction, Callable],
+    pydantic_func: ValidatedFunction,
     use_self: bool,
     callee: Callable,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]],
 ) -> Any:
     returned = None
     resolved = None
-
-    # Convert the *args and **kwargs into a dict of values
-    # mapping the parameter name to the value if given
-    signature = inspect.signature(pydantic_func.raw_function)
-    parameters = signature.parameters
-    bound_arguments = signature.bind_partial(*args, **kwargs)
-    values = {}
-    for name, value in bound_arguments.arguments.items():
-        param = parameters[name]
-        if param.kind == param.VAR_KEYWORD:
-            values.update(value)
-        else:
-            values[name] = value
-
-    if use_self:
-        resolved = values.pop("self")
 
     # Call the pydantic model with the values
     # If an invoker was provided, use it to invoke the function
@@ -61,44 +46,77 @@ def _resolve_and_validate_call(
     def invoked(kw):
         nonlocal returned, resolved
         # "self" must be passed as a positional argument
-        try:
-            returned = pydantic_func.call(*(resolved,) if use_self else (), **kw)
-        except (ValidationError, LegacyValidationError) as e:
-            e = to_legacy_error(e, pydantic_func.model)
-            flat_errors = e.raw_errors
-            name = None
-            if e.model is pydantic_func.model:
-                name = callee.__module__ + "." + callee.__qualname__
-                flat_errors = patch_errors(
-                    errors=flat_errors,
-                    path=(),
-                    values=values,
-                    model=pydantic_func.model,
-                )
-            non_valid_errors = [
-                e for e in flat_errors if not isinstance(e.exc, PydanticErrorMixin)
-            ]
-            if name is None and hasattr(e.model, "type_"):
-                name = e.model.type_.__module__ + "." + e.model.type_.__qualname__
-            e = ConfitValidationError(
-                flat_errors,
-                model=e.model,
-                name=name,
-            )
-            if non_valid_errors:
-                raise e from non_valid_errors[0].exc
-            if not is_debug():
-                e.__cause__ = None
-                e.__suppress_context__ = True
-            raise e
+        if use_self:
+            kw = {**kw, self_name: resolved}
+        model_instance = pydantic_func.model(**kw)
+        returned = pydantic_func.execute(model_instance)
         if not use_self:
             resolved = returned
         return resolved
 
-    if invoker is not None:
-        invoker(invoked, values)
-    else:
-        invoked(values)
+    values = None
+
+    try:
+        try:
+            values = pydantic_func.build_values(args, kwargs)
+
+            if use_self:
+                self_name = pydantic_func.arg_mapping[0]
+                resolved = values.pop(self_name)
+
+            if invoker is not None:
+                invoker(invoked, values)
+            else:
+                invoked(values)
+        except TypeError as type_error:
+            loc_suffix = ()
+            if str(type_error).startswith("multiple values for argument"):
+                loc_suffix = ("v__duplicate_kwargs",)
+            elif str(type_error).startswith("unexpected keyword argument"):
+                loc_suffix = ("kwargs",)
+            raise ConfitValidationError(
+                errors=[ErrorWrapper(type_error, loc_suffix)],
+                model=pydantic_func.model,
+                name=callee.__module__ + "." + callee.__qualname__,
+            )
+    except (ValidationError, LegacyValidationError) as e:
+        e = to_legacy_error(e, pydantic_func.model)
+        flat_errors = e.raw_errors
+        name = None
+        if e.model is pydantic_func.model:
+            name = callee.__module__ + "." + callee.__qualname__
+            flat_errors = patch_errors(
+                errors=flat_errors,
+                path=(),
+                values=values,
+                model=pydantic_func.model,
+                special_names=(
+                    pydantic_func.v_args_name,
+                    pydantic_func.v_kwargs_name,
+                    "v__duplicate_kwargs",
+                    "v__positional_only",
+                    "v__args",
+                    "v__kwargs",
+                ),
+            )
+        non_valid_errors = [
+            e
+            for e in flat_errors
+            if not isinstance(e.exc, (PydanticErrorMixin, TypeError))
+        ]
+        if name is None and hasattr(e.model, "type_"):
+            name = e.model.type_.__module__ + "." + e.model.type_.__qualname__
+        e = ConfitValidationError(
+            flat_errors,
+            model=e.model,
+            name=name,
+        )
+        if non_valid_errors:
+            raise e from non_valid_errors[0].exc
+        if not is_debug():
+            e.__cause__ = None
+            e.__suppress_context__ = True
+        raise e
 
     return returned
 

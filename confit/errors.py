@@ -190,6 +190,7 @@ def patch_errors(
     path: Loc,
     values: Dict = None,
     model: Optional[pydantic.BaseModel] = None,
+    special_names: Sequence[str] = (),
 ):
     """
     Patch the location of the errors to add the `path` prefix and complete
@@ -204,8 +205,9 @@ def patch_errors(
         The path to add to the errors
     values: Dict
         The values of the config
-    post: bool
-        Whether to add the path after the error location
+    special_names: Sequence[str]
+        The names of the special keys of the model signature, to replace with a wildcard
+        when encountered in the error path
 
     Returns
     -------
@@ -215,7 +217,7 @@ def patch_errors(
     if isinstance(errors, list):
         res = []
         for error in errors:
-            res.extend(patch_errors(error, path, values, model))
+            res.extend(patch_errors(error, path, values, model, special_names))
         return res
     if isinstance(errors, ErrorWrapper) and isinstance(
         errors.exc, LegacyValidationError
@@ -240,7 +242,11 @@ def patch_errors(
                 or field_model.vd.model is errors.exc.model
             ):
                 return patch_errors(
-                    errors.exc.raw_errors, (*path, *errors.loc_tuple()), values, model
+                    errors.exc.raw_errors,
+                    (*path, *errors.loc_tuple()),
+                    values,
+                    model,
+                    special_names,
                 )
         except (KeyError, AttributeError):  # pragma: no cover
             print("Could not find model for", errors.loc_tuple())
@@ -286,10 +292,29 @@ def patch_errors(
             PATCHED_ERRORS_CLS[cls] = new_cls
             PATCHED_ERRORS_CLS[new_cls] = new_cls
         errors.exc.__class__ = PATCHED_ERRORS_CLS[cls]
+
+    if (
+        isinstance(errors.exc, TypeError)
+        and str(errors.exc).startswith("unexpected keyword argument")
+        and ":" in errors.exc.args[0]
+    ):
+        extra_keys = errors.exc.args[0].split(": ")[1].split(", ")
+        return [
+            ErrorWrapper(
+                TypeError("unexpected keyword argument"),
+                (*path, *errors.loc_tuple()[:-1], key.strip("'")),
+            )
+            for key in extra_keys
+        ]
+
+    loc_tuple = errors.loc_tuple()
+    if loc_tuple and loc_tuple[-1] in special_names:
+        loc_tuple = (*loc_tuple[:-1], "[signature]")
+
     return [
         ErrorWrapper(
             errors.exc,
-            (*path, *errors.loc_tuple()),
+            (*path, *loc_tuple),
         )
     ]
 

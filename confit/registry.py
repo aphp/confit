@@ -246,7 +246,9 @@ def validate_arguments(
                         callee=_func,
                     )
                 except Exception as e:
-                    if not is_debug():
+                    if not is_debug() and isinstance(
+                        e.__context__, (ValidationError, LegacyValidationError)
+                    ):
                         e.__cause__ = None
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
@@ -277,7 +279,9 @@ def validate_arguments(
                         callee=_func,
                     )
                 except Exception as e:
-                    if not is_debug():
+                    if not is_debug() and isinstance(
+                        e.__cause__, (ValidationError, LegacyValidationError)
+                    ):
                         e.__cause__ = None
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))

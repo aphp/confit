@@ -154,7 +154,7 @@ class Cli(Typer):
                         e.raw_errors,
                         (name,),
                     )
-                    if is_debug():
+                    if is_debug() or e.__cause__ is not None:
                         raise e
                     try:
                         import rich

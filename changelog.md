@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.4.2 - 31-08-2023
+
+### Fixed
+
+- Re-enable extra/duplicate arg errors and uniformize between pydantic v1/v2
+- Add pydantic-core dependency for jsonable types during dump
+
 ## v0.4.1 - 29-08-2023
 
 ### Fixed

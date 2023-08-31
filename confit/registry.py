@@ -38,6 +38,7 @@ def _resolve_and_validate_call(
 ) -> Any:
     returned = None
     resolved = None
+    extras_name = pydantic_func.v_kwargs_name
 
     # Call the pydantic model with the values
     # If an invoker was provided, use it to invoke the function
@@ -48,7 +49,17 @@ def _resolve_and_validate_call(
         # "self" must be passed as a positional argument
         if use_self:
             kw = {**kw, self_name: resolved}
-        model_instance = pydantic_func.model(**kw)
+        extras = [
+            key
+            for key in kw
+            if key not in pydantic_func.model.__fields__ and key != extras_name
+        ]
+        model_instance = pydantic_func.model(
+            **{
+                **{k: v for k, v in kw.items() if k not in extras},
+                **({extras_name: {k: kw[k] for k in extras}} if extras else {}),
+            }
+        )
         returned = pydantic_func.execute(model_instance)
         if not use_self:
             resolved = returned
@@ -59,6 +70,8 @@ def _resolve_and_validate_call(
     try:
         try:
             values = pydantic_func.build_values(args, kwargs)
+            if extras_name in values:
+                values.update(values.pop(extras_name))
 
             if use_self:
                 self_name = pydantic_func.arg_mapping[0]

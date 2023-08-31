@@ -5,7 +5,7 @@ import pytest
 from pydantic import StrictBool
 from typing_extensions import Literal
 
-from confit import Registry
+from confit import Config, Registry
 from confit.errors import ConfitValidationError
 from confit.registry import (
     PYDANTIC_V1,
@@ -372,3 +372,18 @@ def test_clean_error():
         assert e.__suppress_context__ is True
     else:
         assert False, "Should have raised ConfitValidationError"
+
+
+def test_dump_kwargs():
+    @registry.factory.register("kwargs-model")
+    class KwargsModel:
+        def __init__(self, value: float, **mykwargs: int):
+            self.value = value
+            self.mykwargs = mykwargs
+
+    assert dict(Config.serialize(KwargsModel(value=3, a=1, b=2))) == {
+        "@factory": "kwargs-model",
+        "value": 3,
+        "a": 1,
+        "b": 2,
+    }

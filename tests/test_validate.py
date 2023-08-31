@@ -324,3 +324,51 @@ def test_duplicated_arg():
         "-> [signature]\n"
         "   multiple values for argument: 'val'"
     )
+
+
+def test_clean_error():
+    class registry(RegistryCollection):
+        factory = Registry(("test_cli", "factory"), entry_points=True)
+
+    @registry.factory.register("submodel")
+    class SubModel:
+        # Type hinting is optional but recommended !
+        def __init__(self, value: float, card: str = ""):
+            self.value = value
+            self.card = card
+
+        @classmethod
+        def __get_validators__(cls):
+            yield cls.validate
+
+        @classmethod
+        def validate(cls, value, ctx=None):
+            if isinstance(value, dict) and "card" in value:
+                inner_get_card_length(value["card"])
+            return value
+
+    from pydantic.types import PaymentCardNumber
+
+    @validate_arguments
+    def inner_get_card_length(card: PaymentCardNumber):
+        return len(card)
+
+    @validate_arguments
+    def func(submodel: SubModel):
+        pass
+
+    try:
+        func(submodel=dict(value="hi"))
+    except ConfitValidationError as e:
+        assert e.__cause__ is None
+        assert e.__suppress_context__ is True
+    else:
+        assert False, "Should have raised ConfitValidationError"
+
+    try:
+        func(submodel=dict(value="hi", card="hello"))
+    except Exception as e:
+        assert e.__cause__ is None
+        assert e.__suppress_context__ is True
+    else:
+        assert False, "Should have raised ConfitValidationError"

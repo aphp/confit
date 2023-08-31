@@ -525,3 +525,8 @@ def test_root_level_config_error():
         Config({"ok": "ok"}).to_str()
 
     assert "root level config" in str(exc_info.value)
+
+
+def test_simple_dump():
+    config = Config({"section": {"date": datetime.date.today()}})
+    assert config.to_str() == '[section]\ndate = "2023-08-31"\n\n'

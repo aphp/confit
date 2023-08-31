@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.4.3 - 31-08-2023
+
+### Fixed
+
+- Save var kwargs as separate fields
+
 ## v0.4.2 - 31-08-2023
 
 ### Fixed

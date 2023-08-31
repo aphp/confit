@@ -16,6 +16,7 @@ dependencies = [
     "lark>=1.1.5,<2.0",
     "pydantic>=1.2,<3.0",
     "typer>=0.6.1,<1.0",
+    "pydantic-core>=0.20"
 ]
 
 [project.optional-dependencies]

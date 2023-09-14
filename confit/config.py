@@ -138,7 +138,7 @@ class Config(dict):
         s = Config.to_str(self)
         Path(path).write_text(s)
 
-    def serialize(self):
+    def serialize(self: Any):
         """
         Try to convert non-serializable objects using the RESOLVED_TO_CONFIG object
         back to their original catalogue + params form

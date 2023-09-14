@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `deprecated` parameter to register an object under multiple names with deprecation warnings
+
+### Fixed
+
+- Stop interpreting type errors as validation errors when executing a validated function
+
 ## v0.4.3 - 31-08-2023
 
 ### Fixed

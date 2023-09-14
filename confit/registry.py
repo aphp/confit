@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Sequence, TypeVar
 
@@ -320,6 +321,21 @@ def validate_arguments(
         return validate
 
 
+class VisibleDeprecationWarning(UserWarning):
+    """
+    Visible deprecation warning.
+
+    By default, python will not show deprecation warnings, so this class
+    can be used when a very visible warning is helpful, for example because
+    the usage is most likely a user bug.
+
+    Copied from https://github.com/numpy/numpy/blob/965b41d418e6100c1afae0b6f818a7ef152bc25d/numpy/_globals.py#L44-L51
+    """  # noqa: E501
+
+
+VisibleDeprecationWarning.__module__ = "confit"
+
+
 class Registry(catalogue.Registry):
     """
     A registry that validates the input arguments of the registered functions.
@@ -347,6 +363,7 @@ class Registry(catalogue.Registry):
         save_params: Optional[Dict[str, Any]] = None,
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
+        deprecated: Sequence[str] = (),
     ) -> Callable[[catalogue.InFunc], catalogue.InFunc]:
         """
         This is a convenience wrapper around `catalogue.Registry.register`, that
@@ -369,12 +386,14 @@ class Registry(catalogue.Registry):
             It is better to use this than to apply the invoker to the function
             to preserve the signature of the function or the class and enable
             validating its parameters.
+        deprecated: Sequence[str]
+            The deprecated registry names for the function
 
         Returns
         -------
         Callable[[catalogue.InFunc], catalogue.InFunc]
         """
-        registerer = super().register(name)
+        registerer = super().register
 
         save_params = save_params or {f"@{self.namespace[-1]}": name}
 
@@ -400,7 +419,22 @@ class Registry(catalogue.Registry):
                 registry=getattr(self, "registry", None),
                 invoker=invoke,
             )
-            registerer(validated_fn)
+            registerer(name)(validated_fn)
+
+            for deprecated_name in deprecated:
+
+                def make_deprecated_fn(old):
+                    def deprecated_fn(*args, **kwargs):
+                        warnings.warn(
+                            f'"{old}" is deprecated, please use "{name}" instead."',
+                            VisibleDeprecationWarning,
+                        )
+                        return validated_fn(*args, **kwargs)
+
+                    return deprecated_fn
+
+                registerer(deprecated_name)(make_deprecated_fn(deprecated_name))
+
             return validated_fn
 
         if func is not None:

@@ -528,5 +528,5 @@ def test_root_level_config_error():
 
 
 def test_simple_dump():
-    config = Config({"section": {"date": datetime.date.today()}})
+    config = Config({"section": {"date": datetime.date(2023, 8, 31)}})
     assert config.to_str() == '[section]\ndate = "2023-08-31"\n\n'

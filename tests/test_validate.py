@@ -11,6 +11,7 @@ from confit.registry import (
     PYDANTIC_V1,
     RegistryCollection,
     SignatureError,
+    VisibleDeprecationWarning,
     validate_arguments,
 )
 
@@ -387,3 +388,23 @@ def test_dump_kwargs():
         "a": 1,
         "b": 2,
     }
+
+
+def test_deprecated():
+    @registry.factory.register("my-model", deprecated=["my-model-old"])
+    class MyModel:
+        def __init__(self, value: float):
+            self.value = value
+
+    with pytest.warns(VisibleDeprecationWarning) as record:
+        instance = registry.factory.get("my-model-old")(3)
+        assert dict(Config.serialize(instance)) == {
+            "@factory": "my-model",
+            "value": 3,
+        }
+
+    items = [x for x in record if isinstance(x.message, VisibleDeprecationWarning)]
+    assert len(items) == 1
+    assert items[0].message.args[0] == (
+        '"my-model-old" is deprecated, please use "my-model" instead."'
+    )

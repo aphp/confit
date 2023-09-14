@@ -16,10 +16,10 @@ from pydantic import ValidationError
 from confit.config import Config
 from confit.errors import (
     ConfitValidationError,
-    ErrorWrapper,
     LegacyValidationError,
     PydanticErrorMixin,
     SignatureError,
+    convert_type_error,
     patch_errors,
     remove_lib_from_traceback,
     to_legacy_error,
@@ -54,12 +54,15 @@ def _resolve_and_validate_call(
             for key in kw
             if key not in pydantic_func.model.__fields__ and key != extras_name
         ]
-        model_instance = pydantic_func.model(
-            **{
-                **{k: v for k, v in kw.items() if k not in extras},
-                **({extras_name: {k: kw[k] for k in extras}} if extras else {}),
-            }
-        )
+        try:
+            model_instance = pydantic_func.model(
+                **{
+                    **{k: v for k, v in kw.items() if k not in extras},
+                    **({extras_name: {k: kw[k] for k in extras}} if extras else {}),
+                }
+            )
+        except TypeError as type_error:
+            raise convert_type_error(type_error, pydantic_func, callee)
         returned = pydantic_func.execute(model_instance)
         if not use_self:
             resolved = returned
@@ -68,30 +71,18 @@ def _resolve_and_validate_call(
     values = None
 
     try:
-        try:
-            values = pydantic_func.build_values(args, kwargs)
-            if extras_name in values:
-                values.update(values.pop(extras_name))
+        values = pydantic_func.build_values(args, kwargs)
+        if extras_name in values:
+            values.update(values.pop(extras_name))
 
-            if use_self:
-                self_name = pydantic_func.arg_mapping[0]
-                resolved = values.pop(self_name)
+        if use_self:
+            self_name = pydantic_func.arg_mapping[0]
+            resolved = values.pop(self_name)
 
-            if invoker is not None:
-                invoker(invoked, values)
-            else:
-                invoked(values)
-        except TypeError as type_error:
-            loc_suffix = ()
-            if str(type_error).startswith("multiple values for argument"):
-                loc_suffix = ("v__duplicate_kwargs",)
-            elif str(type_error).startswith("unexpected keyword argument"):
-                loc_suffix = ("kwargs",)
-            raise ConfitValidationError(
-                errors=[ErrorWrapper(type_error, loc_suffix)],
-                model=pydantic_func.model,
-                name=callee.__module__ + "." + callee.__qualname__,
-            )
+        if invoker is not None:
+            invoker(invoked, values)
+        else:
+            invoked(values)
     except (ValidationError, LegacyValidationError) as e:
         e = to_legacy_error(e, pydantic_func.model)
         flat_errors = e.raw_errors

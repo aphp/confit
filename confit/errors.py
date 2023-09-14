@@ -327,3 +327,16 @@ def flatten_errors(
             yield from flatten_errors(err)
     else:
         yield errors
+
+
+def convert_type_error(err, pydantic_func, callee):
+    loc_suffix = ()
+    if str(err).startswith("multiple values for argument"):
+        loc_suffix = ("v__duplicate_kwargs",)
+    elif str(err).startswith("unexpected keyword argument"):
+        loc_suffix = ("kwargs",)
+    raise ConfitValidationError(
+        errors=[ErrorWrapper(err, loc_suffix)],
+        model=pydantic_func.model,
+        name=callee.__module__ + "." + callee.__qualname__,
+    )

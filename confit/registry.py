@@ -173,8 +173,8 @@ def validate_arguments(
     def validate(_func: Callable) -> Callable:
         if isinstance(_func, type):
             _func: type
-            if hasattr(_func.__init__, "raw_function"):
-                vd = ValidatedFunction(_func.__init__.raw_function, config)
+            if hasattr(_func.__init__, "__wrapped__"):
+                vd = ValidatedFunction(_func.__init__.__wrapped__, config)
             else:
                 vd = ValidatedFunction(_func.__init__, config)
             vd.model.__name__ = _func.__name__
@@ -257,7 +257,18 @@ def validate_arguments(
                 )
 
             # This function is called when we do Model(variable=..., other=...)
-            @wraps(vd.raw_function)
+            @wraps(
+                vd.raw_function,
+                assigned=(
+                    "__module__",
+                    "__name__",
+                    "__qualname__",
+                    "__doc__",
+                    "__annotations__",
+                    "__defaults__",
+                    "__kwdefaults__",
+                ),
+            )
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
                 try:
                     return _resolve_and_validate_call(
@@ -284,13 +295,24 @@ def validate_arguments(
             _func.model = vd.model  # type: ignore
             _func.model.type_ = _func  # type: ignore
             _func.__init__ = wrapper_function
-            _func.__init__.raw_function = vd.raw_function  # type: ignore
+            _func.__init__.__wrapped__ = vd.raw_function  # type: ignore
             return _func
 
         else:
             vd = ValidatedFunction(_func, config)
 
-            @wraps(_func)
+            @wraps(
+                _func,
+                assigned=(
+                    "__module__",
+                    "__name__",
+                    "__qualname__",
+                    "__doc__",
+                    "__annotations__",
+                    "__defaults__",
+                    "__kwdefaults__",
+                ),
+            )
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
                 try:
                     return _resolve_and_validate_call(
@@ -311,7 +333,7 @@ def validate_arguments(
 
             wrapper_function.vd = vd  # type: ignore
             wrapper_function.validate = vd.init_model_instance  # type: ignore
-            wrapper_function.raw_function = vd.raw_function  # type: ignore
+            wrapper_function.__wrapped__ = vd.raw_function  # type: ignore
             wrapper_function.model = vd.model  # type: ignore
             return wrapper_function
 

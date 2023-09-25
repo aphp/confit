@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.5.1
+
+- Use context instead of func for set_seed to allow
+  ```python
+  with set_seed(42):
+      # do stuff
+      num = random.randint(0, 100)
+  ```
+- Add auto-reload plugin to work with confit wrapped functions in notebooks
+
 ## v0.5.0
 
 ### Added

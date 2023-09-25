@@ -1,12 +1,15 @@
-from .cli import Cli  # noqa F401
-from .config import Config  # noqa F401
+from .cli import Cli
+from .config import Config
 from .registry import (
-    validate_arguments,  # noqa F401
-    Registry,  # noqa F401
-    get_default_registry,  # noqa F401
-    set_default_registry,  # noqa F401
-    RegistryCollection,  # noqa F401
-    VisibleDeprecationWarning,  # noqa F401
+    validate_arguments,
+    Registry,
+    get_default_registry,
+    set_default_registry,
+    RegistryCollection,
+    VisibleDeprecationWarning,
 )
+from .autoreload import autoreload_plugin
 
 __version__ = "0.5.0"
+
+autoreload_plugin()

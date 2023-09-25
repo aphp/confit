@@ -64,6 +64,9 @@ color = true
 omit-covered-files = false
 
 [tool.coverage.report]
+omit = [
+    "confit/autoreload.py",
+]
 exclude_also = [
     "def __repr__",
     "if __name__ == .__main__.:",

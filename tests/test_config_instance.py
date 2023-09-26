@@ -520,6 +520,18 @@ def test_deep_key():
     assert config["section"]["deep"] == {"key": "ok"}
 
 
+def test_escaped_key():
+    config = Config.from_str(
+        """
+    [section]
+    "    escaped" = "ok"
+    """
+    )
+    assert config == {"section": {"    escaped": "ok"}}
+
+    assert config.to_str() == "[section]\n'    escaped' = \"ok\"\n\n"
+
+
 def test_root_level_config_error():
     with pytest.raises(Exception) as exc_info:
         Config({"ok": "ok"}).to_str()

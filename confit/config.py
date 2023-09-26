@@ -96,7 +96,6 @@ class Config(dict):
                     else:
                         current = current[part]
                 current[path[-1]] = loads(v)
-                # current.update({k: loads(v) for k, v in parser.items(section)})
 
         if resolve:
             return config.resolve(registry=registry)
@@ -230,7 +229,9 @@ class Config(dict):
         parser.optionxform = str
         for section_name, section in prepared.items():
             parser.add_section(section_name)
-            parser[section_name].update({k: dumps(v) for k, v in section.items()})
+            parser[section_name].update(
+                {join_path((k,)): dumps(v) for k, v in section.items()}
+            )
         s = StringIO()
         parser.write(s)
         return s.getvalue()

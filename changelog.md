@@ -1,6 +1,22 @@
 # Changelog
 
+## v0.5.2
+
+### Changed
+
+- Keys with dots (or path-like keys in general) will be escaped when serializing a config
+```python
+{"section": {"deep.key": "ok"}}
+```
+will be serialized as
+```ini
+[section]
+'deep.key' = "ok"
+```
+
 ## v0.5.1
+
+### Added
 
 - Use context instead of func for set_seed to allow
   ```python

@@ -4,6 +4,8 @@ from typing import Any, Dict, Tuple, TypeVar, Union
 
 T = TypeVar("T")
 
+KEY_PART = r"(?:'([^']*)'|\"([^\"]*)\"|([^.]*))(?:[.]|$)"
+
 
 def join_path(path):
     """
@@ -17,7 +19,10 @@ def join_path(path):
     -------
     str
     """
-    return ".".join(repr(x) if not isinstance(x, str) or "." in x else x for x in path)
+    return ".".join(
+        repr(x) if not isinstance(x, str) or split_path(x.strip()) != (x,) else x
+        for x in path
+    )
 
 
 def split_path(path: str) -> Tuple[Union[int, str]]:
@@ -35,7 +40,7 @@ def split_path(path: str) -> Tuple[Union[int, str]]:
     """
     offset = 0
     result = []
-    for match in re.finditer(r"(?:'([^']*)'|\"([^\"]*)\"|([^.]*))(?:[.]|$)", str(path)):
+    for match in re.finditer(KEY_PART, str(path)):
         assert match.start() == offset, f"Malformed path: {path!r} in config"
         offset = match.end()
         part = next((g for g in match.groups() if g is not None))

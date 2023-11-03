@@ -247,6 +247,12 @@ def _make_iterencode(
     return _iterencode
 
 
+class MalformedValueError(ValueError):
+    def __init__(self, value: str):
+        self.value = value
+        super().__init__(f"Malformed value: {value!r}")
+
+
 def loads(s: str):
     """
     Load an extended JSON string into a python object.
@@ -263,6 +269,10 @@ def loads(s: str):
     try:
         return XJsonTransformer(s).transform(_json_parser.parse(s))
     except Exception:
+        # Fail if we suspect that it is a malformed object
+        # (e.g. has ', ", {, }, [, ] in it)
+        if set(s) & set(",'\"{}[]$"):
+            raise MalformedValueError(s)
         return s
 
 

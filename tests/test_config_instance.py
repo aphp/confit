@@ -542,3 +542,23 @@ def test_root_level_config_error():
 def test_simple_dump():
     config = Config({"section": {"date": datetime.date(2023, 8, 31)}})
     assert config.to_str() == '[section]\ndate = "2023-08-31"\n\n'
+
+
+def test_fail_if_suspected_json_malformation():
+    with pytest.raises(ConfitValidationError) as exc_info:
+        Config.from_str(
+            """
+        [section]
+        string = 'ok
+        list = 'ok']
+        """
+        )
+    assert str(exc_info.value) == (
+        (
+            "2 validation errors\n"
+            "-> string\n"
+            '   Malformed value: "\'ok"\n'
+            "-> list\n"
+            "   Malformed value: \"'ok']\""
+        )
+    )

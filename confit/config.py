@@ -11,6 +11,7 @@ import pydantic_core
 from confit.errors import (
     ConfitValidationError,
     CyclicReferenceError,
+    ErrorWrapper,
     MissingReference,
     patch_errors,
     remove_lib_from_traceback,
@@ -88,6 +89,7 @@ class Config(dict):
                     current = current[part]
 
             current.clear()
+            errors = []
             for k, v in parser.items(section):
                 path = split_path(k)
                 for part in path[:-1]:
@@ -95,7 +97,13 @@ class Config(dict):
                         current[part] = current = Config()
                     else:
                         current = current[part]
-                current[path[-1]] = loads(v)
+                try:
+                    current[path[-1]] = loads(v)
+                except ValueError as e:
+                    errors.append(ErrorWrapper(e, loc=path))
+
+            if errors:
+                raise ConfitValidationError(errors=errors)
 
         if resolve:
             return config.resolve(registry=registry)

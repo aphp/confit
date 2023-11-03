@@ -544,6 +544,17 @@ def test_simple_dump():
     assert config.to_str() == '[section]\ndate = "2023-08-31"\n\n'
 
 
+def test_list_interpolation():
+    config = Config.from_str(
+        """
+    [section]
+    "key.with.dot" = ["foo", "bar"]
+    b = ${[*section."key.with.dot", "baz"]}
+    """
+    ).resolve()
+    assert config["section"]["b"] == ["foo", "bar", "baz"]
+
+
 def test_fail_if_suspected_json_malformation():
     with pytest.raises(ConfitValidationError) as exc_info:
         Config.from_str(

@@ -6,6 +6,10 @@
 
 - We now raise an error if a value in the config cannot be deserialized as a JSON object but contains characters that hint at a JSON object (e.g. quotes, brackets, etc.). This changes the old behavior where we would silently ignore the value and keep the string as is.
 
+### Fixed
+
+- Allow complex interpolations like `${[*section."key.with.dot", "baz"]}`
+
 ## v0.5.2
 
 ### Changed

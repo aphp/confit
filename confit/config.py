@@ -26,8 +26,10 @@ RESOLVED_TO_CONFIG = WeakKeyDictionary()
 Loc = Tuple[Union[int, str]]
 T = TypeVar("T")
 
-PATH_PART = r"(?:(?:'(?:[^\W0-9?][.\w]*)'|\"(?:[^\W0-9][.\w]*)\"|(?:[^\W0-9]\w*)))"
-PATH = rf"(?:(?:{PATH_PART}[.])*{PATH_PART})"
+ID = r"[^\d\W]\w*"
+UNQUOTED_ID = rf"(?<![\'\"\w]){ID}(?![\'\"\w])"
+PATH_PART = rf"(?:'{ID}(?:[.]{ID})+'|\"{ID}(?:[.]{ID})+\"|{UNQUOTED_ID})"
+PATH = rf"{UNQUOTED_ID}(?:[.]{PATH_PART})*"
 
 
 class Config(dict):

@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.4
+
+### Fixed
+
+- We now forward function signature when accessing a callable via a deprecated registry name.
+  This is useful when registry.get("deprecated-name") is inspected.
+
 ## v0.5.3
 
 ### Changed

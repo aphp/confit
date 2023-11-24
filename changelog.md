@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.5.5
+
+### Added
+
+- Support fixing the path of validation errors raised inside a "validate" function (see the `AsList` meta type in the tests)
+
 ## v0.5.4
 
 ### Fixed

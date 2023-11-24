@@ -1,5 +1,5 @@
 from textwrap import indent
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import pydantic
 
@@ -185,13 +185,17 @@ def to_legacy_error(err: pydantic.ValidationError, model: Any) -> LegacyValidati
     return ConfitValidationError(raw_errors, model=model)
 
 
+T = TypeVar("T")
+
+
 def patch_errors(
-    errors: Union[Sequence[ErrorWrapper], ErrorWrapper],
-    path: Loc,
+    errors: T,
+    path: Loc = (),
     values: Dict = None,
     model: Optional[pydantic.BaseModel] = None,
     special_names: Sequence[str] = (),
-):
+    drop_names: Sequence[str] = (),
+) -> T:
     """
     Patch the location of the errors to add the `path` prefix and complete
     the errors with the actual value if it is available.
@@ -199,7 +203,7 @@ def patch_errors(
 
     Parameters
     ----------
-    errors: Union[Sequence[ErrorWrapper], ErrorWrapper]
+    errors: Union[LegacyValidationError, Sequence[ErrorWrapper], ErrorWrapper]
         The pydantic errors to patch
     path: Loc
         The path to add to the errors
@@ -208,16 +212,26 @@ def patch_errors(
     special_names: Sequence[str]
         The names of the special keys of the model signature, to replace with a wildcard
         when encountered in the error path
+    model: Optional[pydantic.BaseModel]
+        The model of the config
+    drop_names: Sequence[str]
+        The names of the keys to drop from the error path
 
     Returns
     -------
-    Union[Sequence[ErrorWrapper], ErrorWrapper]
+    Union[LegacyValidationError, Sequence[ErrorWrapper], ErrorWrapper]
         The patched errors
     """
+    if isinstance(errors, pydantic.ValidationError):
+        errors = to_legacy_error(errors, model).raw_errors
+        errors = patch_errors(errors, path, values, model, special_names, drop_names)
+        return ConfitValidationError(errors, model=model)
     if isinstance(errors, list):
         res = []
         for error in errors:
-            res.extend(patch_errors(error, path, values, model, special_names))
+            res.extend(
+                patch_errors(error, path, values, model, special_names, drop_names)
+            )
         return res
     if isinstance(errors, ErrorWrapper) and isinstance(
         errors.exc, LegacyValidationError
@@ -247,6 +261,7 @@ def patch_errors(
                     values,
                     model,
                     special_names,
+                    drop_names,
                 )
         except (KeyError, AttributeError):  # pragma: no cover
             print("Could not find model for", errors.loc_tuple())
@@ -310,6 +325,7 @@ def patch_errors(
     loc_tuple = errors.loc_tuple()
     if loc_tuple and loc_tuple[-1] in special_names:
         loc_tuple = (*loc_tuple[:-1], "[signature]")
+    loc_tuple = tuple(part for part in loc_tuple if part not in drop_names)
 
     return [
         ErrorWrapper(

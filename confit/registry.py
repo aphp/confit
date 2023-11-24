@@ -446,6 +446,7 @@ class Registry(catalogue.Registry):
             for deprecated_name in deprecated:
 
                 def make_deprecated_fn(old):
+                    @wraps(fn)
                     def deprecated_fn(*args, **kwargs):
                         warnings.warn(
                             f'"{old}" is deprecated, please use "{name}" instead."',

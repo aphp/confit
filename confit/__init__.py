@@ -10,6 +10,6 @@ from .registry import (
 )
 from .autoreload import autoreload_plugin
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 autoreload_plugin()

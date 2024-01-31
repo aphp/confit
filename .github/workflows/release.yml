@@ -14,23 +14,25 @@ on:
 
 jobs:
 
-  build_sdist:
-    name: Build source distribution
+  Build:
+    name: Build package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
 
       - name: Build sdist
-        run: pipx run build --sdist
+        run: pipx run build --sdist --wheel
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
-          path: dist/*.tar.gz
+          path: |
+            dist/*.tar.gz
+            dist/*.whl
 
   PyPI:
     name: Upload to PyPI
 
-    needs: [build_sdist]
+    needs: [Build]
     runs-on: ubuntu-latest
 
     steps:

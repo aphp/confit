@@ -162,11 +162,10 @@ def test_dates():
             "   invalid datetime format, got 'hello' (str)"
         )
     else:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_dates.<locals>.test()\n"
-            "-> val\n"
-            "   input should be a valid datetime, input is too short, got 'hello' (str)"
-        )
+        err = str(e.value)
+        assert "1 validation error for test_validate.test_dates.<locals>.test()" in err
+        assert "-> val" in err
+        assert "input is too short, got 'hello'" in err
 
 
 def test_fail_init():

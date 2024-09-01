@@ -1,5 +1,4 @@
 import ast
-from json.encoder import py_encode_basestring_ascii
 from typing import Any, Callable
 
 from lark import Lark, Transformer, Tree
@@ -53,7 +52,7 @@ xjson_grammar = r"""
     list : "[" (value ("," value) * ","?)? "]"
     tuple : "(" (value ("," value) * ","?)? ")"
 
-    dict : "{" [pair ("," pair)*] "}"
+    dict : "{" (pair ("," pair)*) ? "}"
     pair : string ":" value
 
     string : STRING
@@ -69,7 +68,6 @@ xjson_grammar = r"""
     SIGNED_FLOAT: ["+"|"-"] FLOAT
     SIGNED_INT: ["+"|"-"] INT
 
-    %import common.ESCAPED_STRING
     %import common.LETTER
     %import common.DIGIT
     %import common.FLOAT
@@ -98,8 +96,7 @@ class XJsonTransformer(Transformer):
     def string(self, s):
         """Parse string"""
         (s,) = s
-        s = ast.literal_eval(s)
-        return s
+        return ast.literal_eval(s)
 
     def float(self, n):
         """Parse number"""
@@ -164,9 +161,17 @@ def _floatstr(o, _repr=float.__repr__, _inf=float("inf"), _neginf=-float("inf"))
     return text
 
 
+def _encode_str(s):
+    """Return an ASCII-only JSON representation of a Python string"""
+    r = repr(s)
+    if s.count('"') <= s.count("'") and r.startswith("'"):
+        r = '"' + s.replace('"', '\\"').replace("\\'", "'") + '"'
+    return r
+
+
 def _make_iterencode(
     floatstr: Callable[[float], str] = _floatstr,
-    encoder: Callable[[str], str] = py_encode_basestring_ascii,
+    encoder: Callable[[str], str] = _encode_str,
     intstr: Callable[[int], str] = int.__repr__,
     separator=",",
 ):

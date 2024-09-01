@@ -270,7 +270,7 @@ foo = "foo"
 bar = "bar"
 val = "val"
 quoted = "'val'"
-esc = "\\"val\\""
+esc = '"val"'
 
 """
     )
@@ -573,3 +573,20 @@ def test_fail_if_suspected_json_malformation():
             "   Malformed value: \"'ok']\""
         )
     )
+
+
+def test_string():
+    config = Config.from_str(
+        """
+    [section]
+    string1 = '\"ok\"'
+    # When writing config strings in Python
+    # We have to double escape the backslashes,
+    # once for Python and once for the config parser
+    string2 = "\\\\bok\\\\b"
+    string3 = ok
+    """
+    )
+    assert config["section"]["string1"] == '"ok"'
+    assert config["section"]["string2"] == "\\bok\\b"
+    assert config["section"]["string3"] == "ok"

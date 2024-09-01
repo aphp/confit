@@ -287,15 +287,13 @@ def validate_arguments(
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
-            _func.vd = vd  # type: ignore
-            _func.__get_validators__ = __get_validators__  # type: ignore
-            _func.__get_pydantic_core_schema__ = (
-                __get_pydantic_core_schema__  # type: ignore
-            )
-            _func.model = vd.model  # type: ignore
-            _func.model.type_ = _func  # type: ignore
+            _func.vd = vd
+            _func.__get_validators__ = __get_validators__
+            _func.__get_pydantic_core_schema__ = __get_pydantic_core_schema__
+            # _func.model = vd.model
+            # _func.model.type_ = _func
             _func.__init__ = wrapper_function
-            _func.__init__.__wrapped__ = vd.raw_function  # type: ignore
+            _func.__init__.__wrapped__ = vd.raw_function
             return _func
 
         else:

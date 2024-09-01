@@ -8,8 +8,5 @@ from .registry import (
     RegistryCollection,
     VisibleDeprecationWarning,
 )
-from .autoreload import autoreload_plugin
 
 __version__ = "0.5.6"
-
-autoreload_plugin()

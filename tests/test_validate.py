@@ -195,14 +195,14 @@ def test_fail_init():
     with pytest.raises(ConfitValidationError) as e:
         Model(raise_attribute=False)
     if PYDANTIC_V1:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+            "1 validation error for SubModel()\n"
             "-> raise_attribute\n"
             "   field required"
         )
     else:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+            "1 validation error for SubModel()\n"
             "-> raise_attribute\n"
             "   field required"
         )
@@ -210,14 +210,14 @@ def test_fail_init():
     with pytest.raises(ConfitValidationError) as e:
         BigModel(model=dict(raise_attribute="ok"))
     if PYDANTIC_V1:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+            "1 validation error for BigModel()\n"
             "-> model.raise_attribute\n"
             "   value is not a valid boolean, got 'ok' (str)"
         )
     else:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+            "1 validation error for BigModel()\n"
             "-> model.raise_attribute\n"
             "   input should be a valid boolean, got 'ok' (str)"
         )
@@ -226,10 +226,10 @@ def test_fail_init():
     with pytest.raises(ConfitValidationError) as e:
         BigModel(model=dict(raise_attribute=False))
     # Nested error because we cannot merge the submodel error into the model error
-    assert str(e.value) == (
-        "1 validation error for test_validate.test_fail_init.<locals>.BigModel()\n"
+    assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+        "1 validation error for BigModel()\n"
         "-> model\n"
-        "   1 validation error for test_validate.test_fail_init.<locals>.SubModel()\n"
+        "   1 validation error for SubModel()\n"
         "   -> raise_attribute\n"
         "      field required"
     )

@@ -75,7 +75,7 @@ class Config(dict):
         -------
         Config
         """
-        parser = ConfigParser()
+        parser = ConfigParser(interpolation=None)
         parser.optionxform = str
         parser.read_string(s)
 
@@ -235,7 +235,7 @@ class Config(dict):
         prepared = flatten_sections(Config.serialize(self))
         prepared.update(flatten_sections(additional_sections))
 
-        parser = ConfigParser()
+        parser = ConfigParser(interpolation=None)
         parser.optionxform = str
         for section_name, section in prepared.items():
             parser.add_section(section_name)

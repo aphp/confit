@@ -26,6 +26,11 @@ from confit.errors import (
     to_legacy_error,
 )
 
+try:
+    import importlib.metadata as importlib_metadata
+except ImportError:
+    import importlib_metadata
+
 PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
 
 
@@ -309,6 +314,7 @@ def validate_arguments(
                     "__annotations__",
                     "__defaults__",
                     "__kwdefaults__",
+                    "__signature__",
                 ),
             )
             def wrapper_function(*args: Any, **kwargs: Any) -> Any:
@@ -427,7 +433,6 @@ class Registry(catalogue.Registry):
             return resolved
 
         def wrap_and_register(fn: catalogue.InFunc) -> catalogue.InFunc:
-
             if save_params is not None:
                 _check_signature_for_save_params(
                     fn if not isinstance(fn, type) else fn.__init__
@@ -463,7 +468,18 @@ class Registry(catalogue.Registry):
         else:
             return wrap_and_register
 
-    def get(self, name: str) -> catalogue.InFunc:
+    def get_entry_points(self):
+        """Get registered entry points from other packages for this namespace.
+
+        RETURNS (Dict[str, Any]): Entry points, keyed by name.
+        """
+        entrypoints = importlib_metadata.entry_points()
+        if hasattr(entrypoints, "select"):
+            return entrypoints.select(group=self.entry_point_namespace)
+        else:  # dict
+            return entrypoints.get(self.entry_point_namespace, [])
+
+    def get(self, name: str):
         """
         Get the registered function for a given name.
 
@@ -480,17 +496,21 @@ class Registry(catalogue.Registry):
         -------
         catalogue.InFunc
         """
-        if self.entry_points:
-            from_entry_point = self.get_entry_point(name)
-            if from_entry_point:
-                return from_entry_point
-        namespace = list(self.namespace) + [name]
-        if not catalogue.check_exists(*namespace):
-            raise catalogue.RegistryError(
-                f"Can't find '{name}' in registry {' -> '.join(self.namespace)}. "
-                f"Available names: {', '.join(sorted(self.get_available())) or 'none'}"
-            )
-        return catalogue._get(namespace)
+        path = list(self.namespace) + [name]
+        try:
+            return catalogue._get(path)
+        except catalogue.RegistryError:
+            if self.entry_points:
+                from_entry_point = self.get_entry_point(name)
+                if from_entry_point:
+                    return from_entry_point
+            if not catalogue.check_exists(*path):
+                raise catalogue.RegistryError(
+                    f"Can't find '{name}' in registry {' -> '.join(self.namespace)}. "
+                    f"Available names: "
+                    f"{', '.join(sorted(self.get_available())) or 'none'}"
+                )
+            return catalogue._get(path)
 
     def get_available(self) -> Sequence[str]:
         """Get all functions for a given namespace.

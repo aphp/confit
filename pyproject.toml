@@ -110,6 +110,7 @@ fixable = ["E", "F", "W", "I"]
 
 [tool.ruff.isort]
 known-first-party = ["confit"]
+known-third-party = ["build"]
 
 [tool.mypy]
 plugins = "pydantic.mypy"

@@ -7,6 +7,7 @@
 - Support IPython autoreload on confit wrapped functions
 - Support using config files with scripts without a dedicated section header
 - Disable configparser interpolation (% symbol)
+- Better support for escaped strings in config files
 
 ### Added
 

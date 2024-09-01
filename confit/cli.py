@@ -130,7 +130,9 @@ class Cli(Typer):
                         current = current.setdefault(part, Config())
                     current[parts[-1]] = v
                 try:
-                    resolved_config = config.resolve(registry=registry)
+                    resolved_config = Config(config[name]).resolve(
+                        registry=registry, root=config
+                    )
                     default_seed = model_fields.get("seed")
                     if default_seed is not None:
                         default_seed = default_seed.get_default()
@@ -144,11 +146,11 @@ class Cli(Typer):
                             unresolved_config=config,
                         )
                         return validated(
-                            **resolved_config.get(name, {}),
+                            **resolved_config,
                             config_meta=config_meta,
                         )
                     else:
-                        return validated(**resolved_config.get(name, {}))
+                        return validated(**resolved_config)
                 except (LegacyValidationError, ConfitValidationError) as e:
                     e.raw_errors = patch_errors(
                         e.raw_errors,

@@ -5,6 +5,11 @@
 ### Fixed
 
 - Support IPython autoreload on confit wrapped functions
+- Support using config files with scripts without a dedicated section header
+
+### Added
+
+- Non-relevant fields (outside the script dedicated section) are no longer instantiated when running a script with a config file
 
 ## v0.5.5
 

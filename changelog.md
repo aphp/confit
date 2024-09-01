@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Support IPython autoreload on confit wrapped functions
+
 ## v0.5.5
 
 ### Added

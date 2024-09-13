@@ -1,7 +1,7 @@
 ![Tests](https://img.shields.io/github/actions/workflow/status/aphp/confit/tests.yml?branch=main&label=tests&style=flat-square)
 [![Documentation](https://img.shields.io/github/actions/workflow/status/aphp/confit/documentation.yml?branch=main&label=docs&style=flat-square)](https://aphp.github.io/confit/latest/)
 [![PyPI](https://img.shields.io/pypi/v/confit?color=blue&style=flat-square)](https://pypi.org/project/confit/)
-[![Codecov](https://img.shields.io/codecov/c/github/aphp/confit?logo=codecov&style=flat-square)](https://codecov.io/gh/aphp/confit)
+[![Coverage](https://raw.githubusercontent.com/aphp/confit/coverage/coverage.svg)](https://raw.githubusercontent.com/aphp/confit/coverage/coverage.txt)
 
 
 # Confit

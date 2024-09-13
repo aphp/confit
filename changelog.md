@@ -13,6 +13,7 @@
 ### Added
 
 - Non-relevant fields (outside the script dedicated section) are no longer instantiated when running a script with a config file
+- We now support loading and serializing configs in yaml syntax (`Confit.from_yaml_str`, `Confit.to_yaml_str`, `Confit.from_disk("___.yaml")` and `Confit.to_disk("___.yaml")`)
 
 ## v0.5.5
 

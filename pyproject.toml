@@ -65,8 +65,10 @@ color = true
 omit-covered-files = false
 
 [tool.coverage.report]
+precision = 2
+include = ["confit/*"]
 omit = [
-    "confit/autoreload.py",
+    "tests/*",
 ]
 exclude_also = [
     "def __repr__",
@@ -74,14 +76,18 @@ exclude_also = [
     "@overload",
     "pragma: no cover",
     "raise .*Error",
+    "raise .*Exception",
+    "warn\\(",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
-    "Span.set_extension.*",
-    "Doc.set_extension.*",
-    "Token.set_extension.*",
 ]
+
+[tool.coverage.run]
+include = ["confit/*"]
+concurrency = ["multiprocessing"]
+parallel = true
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -117,5 +123,5 @@ known-third-party = ["build"]
 plugins = "pydantic.mypy"
 
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"

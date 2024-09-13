@@ -44,7 +44,7 @@ class BigModel:
         return self.hidden_value
 
 
-pipeline_config = """\
+pipeline_cfg_config = """\
 [script]
 modelA = ${modelA}
 modelB = ${modelB}
@@ -67,7 +67,7 @@ submodel = ${modelA.submodel}
 
 
 def test_read_from_str():
-    config = Config().from_str(pipeline_config)
+    config = Config().from_str(pipeline_cfg_config)
     assert config == {
         "modelA": {
             "@factory": "bigmodel",
@@ -88,7 +88,7 @@ def test_read_from_str():
     resolved = config.resolve(registry=registry)
     assert isinstance(resolved["modelA"].submodel, SubModel)
     exported_config = config.to_str()
-    assert exported_config == pipeline_config
+    assert exported_config == pipeline_cfg_config
 
 
 def test_write_to_str():
@@ -101,21 +101,21 @@ def test_write_to_str():
             )
         ).to_str()
 
-    exported = reexport(pipeline_config)
+    exported = reexport(pipeline_cfg_config)
     assert reexport(exported) == exported
 
 
 # store to a temp file
 def test_to_disk(tmp_path):
     dest = tmp_path / "test.cfg"
-    config = Config().from_str(pipeline_config)
+    config = Config().from_str(pipeline_cfg_config)
     config.to_disk(dest)
     config2 = Config().from_disk(dest)
     assert config == config2
 
 
 def test_write_resolved_to_str():
-    s = Config().from_str(pipeline_config, resolve=True, registry=registry)
+    s = Config().from_str(pipeline_cfg_config, resolve=True, registry=registry)
     assert s["modelA"] is s["script"]["modelA"]
     assert (
         s.to_str()
@@ -419,7 +419,7 @@ def test_absolute_dump_path():
 
 
 def test_merge():
-    config = Config().from_str(pipeline_config, resolve=False)
+    config = Config().from_str(pipeline_cfg_config, resolve=False)
     other = Config().from_str(
         """\
 [modelA.submodel]
@@ -505,7 +505,7 @@ value = 12.0
 
 
 def test_partial_interpolation():
-    config = Config.from_str(pipeline_config)
+    config = Config.from_str(pipeline_cfg_config)
     model = config["modelB"].resolve(registry=registry, root=config)
     assert isinstance(model.submodel, SubModel)
 
@@ -565,13 +565,11 @@ def test_fail_if_suspected_json_malformation():
         """
         )
     assert str(exc_info.value) == (
-        (
-            "2 validation errors\n"
-            "-> string\n"
-            '   Malformed value: "\'ok"\n'
-            "-> list\n"
-            "   Malformed value: \"'ok']\""
-        )
+        "2 validation errors\n"
+        "-> string\n"
+        '   Malformed value: "\'ok"\n'
+        "-> list\n"
+        "   Malformed value: \"'ok']\""
     )
 
 
@@ -590,3 +588,72 @@ def test_string():
     assert config["section"]["string1"] == '"ok"'
     assert config["section"]["string2"] == "\\bok\\b"
     assert config["section"]["string3"] == "ok"
+
+
+pipeline_yaml_config = """\
+script:
+    modelA: ${modelA}
+    modelB: ${modelB}
+    hidden_value: ${modelA:hidden_value}
+modelA:
+    '@factory': bigmodel
+    date: '2003-02-01'
+    submodel:
+        '@factory': submodel
+        value: 12.0
+modelB:
+    '@factory': bigmodel
+    date: '2003-04-05'
+    submodel: ${modelA.submodel}
+"""
+
+
+def test_read_write_yaml_str():
+    config = Config().from_yaml_str(pipeline_yaml_config)
+    assert config == {
+        "script": {
+            "modelA": Reference("modelA"),
+            "modelB": Reference("modelB"),
+            "hidden_value": Reference("modelA:hidden_value"),
+        },
+        "modelA": {
+            "@factory": "bigmodel",
+            "date": "2003-02-01",
+            "submodel": {"@factory": "submodel", "value": 12},
+        },
+        "modelB": {
+            "@factory": "bigmodel",
+            "date": "2003-04-05",
+            "submodel": Reference("modelA.submodel"),
+        },
+    }
+    config_str = config.to_yaml_str()
+    assert config_str == pipeline_yaml_config
+
+
+def test_to_from_disk(tmp_path):
+    dest = tmp_path / "test.yml"
+    config = Config().from_yaml_str(pipeline_yaml_config)
+    config.to_disk(dest)
+    config2 = Config().from_disk(dest)
+    assert config == config2
+
+
+def test_yaml_str_dump():
+    cfg = Config.from_yaml_str(
+        """\
+ner:
+    "@key": 'eds."normalizer.test".ok'
+    test.ok: ${ner.pollution}
+    pollution: false
+"""
+    )
+    assert (
+        cfg.to_yaml_str()
+        == """\
+ner:
+    '@key': 'eds."normalizer.test".ok'
+    test.ok: ${ner.pollution}
+    pollution: false
+"""
+    )

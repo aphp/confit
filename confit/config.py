@@ -57,7 +57,7 @@ class Config(dict):
         super().__init__(**kwargs)
 
     @classmethod
-    def from_str(cls, s: str, resolve: bool = False, registry: Any = None) -> Any:
+    def from_cfg_str(cls, s: str, resolve: bool = False, registry: Any = None) -> Any:
         """
         Load a config object from a config string
 
@@ -113,6 +113,23 @@ class Config(dict):
         return config
 
     @classmethod
+    def from_yaml_str(cls, s: str, resolve: bool = False, registry: Any = None) -> Any:
+        import yaml
+
+        class ConfitYamlLoader(yaml.SafeLoader):
+            def construct_object(self, x, deep=False):
+                if isinstance(x, yaml.ScalarNode):
+                    return loads(self.buffer[x.start_mark.index : x.end_mark.index])
+                return super().construct_object(x, deep)
+
+        stream = StringIO(s)
+        config = Config(yaml.load(stream, Loader=ConfitYamlLoader))
+        if resolve:
+            return config.resolve(registry=registry)
+
+        return config
+
+    @classmethod
     def from_disk(
         cls, path: Union[str, Path], resolve: bool = False, registry: Any = None
     ) -> "Config":
@@ -124,7 +141,7 @@ class Config(dict):
         path: Union[str, Path]
             The path to the config object
         resolve
-            Whether to resolve sections with '@' keys
+            Whether to resolve mappings with '@' keys
         registry
             Optional registry to resolve from.
             If None, the default registry will be used.
@@ -133,8 +150,14 @@ class Config(dict):
         -------
         Config
         """
-        s = Path(path).read_text()
-        return cls.from_str(s, resolve=resolve, registry=registry)
+        s = Path(path).read_text(encoding="utf-8")
+        path_str = str(path)
+        if path_str.endswith(".yaml") or path_str.endswith(".yml"):
+            return cls.from_yaml_str(s, resolve=resolve, registry=registry)
+        else:
+            return cls.from_cfg_str(s, resolve=resolve, registry=registry)
+
+    from_str = from_cfg_str
 
     def to_disk(self, path: Union[str, Path]):
         """
@@ -144,7 +167,11 @@ class Config(dict):
         ----------
         path: Union[str, path]
         """
-        s = Config.to_str(self)
+        path_str = str(path)
+        if path_str.endswith(".yaml") or path_str.endswith(".yml"):
+            s = self.to_yaml_str()
+        else:
+            s = Config.to_str(self)
         Path(path).write_text(s)
 
     def serialize(self: Any):
@@ -208,7 +235,7 @@ class Config(dict):
                 pass
             try:
                 cfg = (cfg or Config()).merge(o.cfg)
-            except AttributeError:
+            except (AttributeError, TypeError):
                 pass
             if cfg is not None:
                 mem.append(o)
@@ -221,7 +248,7 @@ class Config(dict):
 
         return rec(self)
 
-    def to_str(self):
+    def to_cfg_str(self):
         """
         Export a config to a string in the cfg format
         by serializing it first
@@ -245,6 +272,36 @@ class Config(dict):
         s = StringIO()
         parser.write(s)
         return s.getvalue()
+
+    def to_yaml_str(self):
+        import yaml
+
+        class ConfitYamlDumper(yaml.SafeDumper):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+
+            def represent_ref(self, node):
+                return super().represent_scalar("tag:yaml.org,2002:str", str(node))
+
+            def represent_str(self, data):
+                node = super().represent_scalar("tag:yaml.org,2002:str", data)
+                if set(",'\"{}[]$") & set(data):
+                    # node.value = dumps(data)
+                    node.style = "'" if data.count('"') > data.count("'") else '"'
+                return node
+
+            yaml_representers = {
+                **yaml.SafeDumper.yaml_representers,
+                Config: yaml.SafeDumper.represent_dict,
+                Reference: represent_ref,
+                str: represent_str,
+            }
+
+        return yaml.dump(
+            self.serialize(), Dumper=ConfitYamlDumper, sort_keys=False, indent=4
+        )
+
+    to_str = to_cfg_str
 
     def resolve(self, deep=True, registry: Any = None, root: Mapping = None) -> Any:
         """

@@ -67,12 +67,23 @@ class MyClass:
         self.value2 = value2
 ```
 
-```ini title="config.cfg"
-[myclass]
-@factory = "my-class"
-value1 = 1.1
-value2 = 2.5
-```
+=== "INI syntax"
+
+    ```ini title="config.cfg"
+    [myclass]
+    @factory = "my-class"
+    value1 = 1.1
+    value2 = 2.5
+    ```
+
+=== "YAML syntax"
+
+    ```yaml title="config.yaml"
+    myclass:
+      "@factory": "my-class"
+      value1: 1.1
+      value2: 2.5
+    ```
 
 Ici, **Confit** va :
 
@@ -85,15 +96,26 @@ Ici, **Confit** va :
 
 Lorsque plusieurs sections de la configuration doivent accéder à la même valeur, vous pouvez utiliser une référence avec la syntaxe `${<section.value>}` :
 
-```ini title="config.cfg"
-[myclass]
-@factory = "my-class"
-value1 = 1.1
-value2 = ${other_values.value3}
+=== "INI syntax"
 
-[other_values]
-value3 = 10
-```
+    ```ini title="config.cfg"
+    [myclass]
+    @factory = "my-class"
+    value1 = 1.1
+    value2 = ${other_values.value3}
+
+    [other_values]
+    value3 = 10
+    ```
+
+=== "YAML syntax"
+
+    ```yaml title="config.yaml"
+    myclass:
+      "@factory": "my-class"
+      value1: 1.1
+      value2: ${other_values.value3}
+    ```
 
 Ici, `value2` sera défini à 10, comme `value3`.
 
@@ -101,19 +123,37 @@ Ici, `value2` sera défini à 10, comme `value3`.
 
 Vous pouvez même passer des objets instanciés ! Supposons que nous ayons une classe enregistrée `myOtherClass` attendant une instance de `MyClass` en entrée. Vous pourriez utiliser la configuration suivante :
 
-```ini title="config.cfg"
-[func]
-@factory = "my-other-class"
-obj = ${myclass}
+=== "INI syntax"
 
-[myclass]
-@factory = "my-class"
-value1 = 1.1
-value2 = ${other_values.value3}
+    ```ini title="config.cfg"
+    [func]
+    @factory = "my-other-class"
+    obj = ${myclass}
 
-[other_values]
-value3 = 10
-```
+    [myclass]
+    @factory = "my-class"
+    value1 = 1.1
+    value2 = ${other_values.value3}
+
+    [other_values]
+    value3 = 10
+    ```
+
+=== "YAML syntax"
+
+    ```yaml title="config.yaml"
+    func:
+      "@factory": "my-other-class"
+      obj: ${myclass}
+
+    myclass:
+        "@factory": "my-class"
+        value1: 1.1
+        value2: ${other_values.value3}
+
+    other_values:
+        value3: 10
+    ```
 
 Enfin, vous pouvez vouloir accéder à certains attributs des classes Python qui sont disponibles *après* l'instanciation, mais pas présents dans le fichier de configuration. Par exemple, modifions notre classe `MyClass` :
 
@@ -128,13 +168,26 @@ class MyClass:
 
 Pour accéder à ces valeurs directement dans le fichier de configuration, utilisez la syntaxe `${<obj:attribut>}` (remarquez les **deux points** au lieu du **point**)
 
+=== "INI syntax"
 
-```ini title="config.cfg"
-[objet]
-@factory = "ma-classe
-valeur1 = 1.1
-valeur2 = 2.5
+    ```ini title="config.cfg"
+    [object]
+    @factory = "my-class"
+    value1 = 1.1
+    value2 = 2.5
 
-[autres_valeurs]
-valeur3 = ${objet:valeur_cachée}
-```
+    [other_values]
+    value3 = ${object:hidden_value}
+    ```
+
+=== "YAML syntax"
+
+    ```yaml title="config.yaml"
+    object:
+      "@factory": "my-class"
+      value1: 1.1
+      value2: 2.5
+
+    other_values:
+        value3: ${object:hidden_value}
+    ```

@@ -65,6 +65,8 @@ def func(modelA: BigModel, modelB: BigModel, seed: int = 42):
 
 Create a new config file
 
+The following also works with YAML files
+
 <h5 a><strong><code>config.cfg</code></strong></h5>
 
 ```ini

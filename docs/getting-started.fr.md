@@ -55,35 +55,68 @@ def func(modelA: BigModel, modelB: BigModel, other: int, seed: int):
 
 Créez un nouveau fichier de configuration
 
-```ini title="config.cfg"
-# Sections CLI
-[script]
-modelA = ${modelA}
-modelB = ${modelB}
+=== "INI syatax"
 
-# Paramètres communs CLI
-[modelA]
-@factory = "bigmodel"
-date = "2010-10-10"
+    ```ini title="config.cfg"
+    # CLI sections
+    [script]
+    modelA = ${modelA}
+    modelB = ${modelB}
 
-[modelA.submodel]
-@factory = "submodel"
-value = 12
+    # CLI common parameters
+    [modelA]
+    @factory = "bigmodel"
+    date = "2010-10-10"
 
-[modelB]
-date = "2003-04-05"
-submodel = ${modelA.submodel}
-```
+    [modelA.submodel]
+    @factory = "submodel"
+    value = 12
 
-et exécutez la commande suivante depuis le terminal
+    [modelB]
+    date = "2003-04-05"
+    submodel = ${modelA.submodel}
+    ```
 
-<div class="termy">
+    et exécutez la commande suivante depuis le terminal
 
-```console
-$ python script.py --config config.cfg --seed 42
-```
+    <div class="termy">
 
-</div>
+    ```console
+    $ python script.py --config config.cfg --seed 42
+    ```
+
+    </div>
+
+=== "YAML syntax"
+
+    ```yaml title="config.yaml"
+    script:
+      modelA: ${modelA}
+      modelB: ${modelB}
+
+    modelA:
+      "@factory": "bigmodel"
+      date: "2010-10-10"
+
+      submodel:
+        "@factory": "submodel"
+        value: 12
+
+    modelB:
+      date: "2003-04-05"
+      submodel: ${modelA.submodel}
+    ```
+
+    et exécutez la commande suivante depuis le terminal
+
+    <div class="termy">
+
+    ```console
+    $ python script.py --config config.yaml --seed 42
+    ```
+
+    </div>
+
 !!! tip "Nom"
 
     Pour utiliser le nom de votre chemin de configuration (par exemple `config-expe-2` si le fichier de configuration est nommé `config-expe-2.cfg` *dans** la configuration (après résolution), mentionnez simplement `name = None` sous la section dont le titre a été fourni à `@app.command(name=<section-title>)`

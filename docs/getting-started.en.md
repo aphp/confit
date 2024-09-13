@@ -57,35 +57,68 @@ def func(modelA: BigModel, modelB: BigModel, other: int, seed: int):
 
 Create a new config file
 
-```ini title="config.cfg"
-# CLI sections
-[script]
-modelA = ${modelA}
-modelB = ${modelB}
+=== "INI syntax"
 
-# CLI common parameters
-[modelA]
-@factory = "bigmodel"
-date = "2010-10-10"
+    ```ini title="config.cfg"
+    # CLI sections
+    [script]
+    modelA = ${modelA}
+    modelB = ${modelB}
 
-[modelA.submodel]
-@factory = "submodel"
-value = 12
+    # CLI common parameters
+    [modelA]
+    @factory = "bigmodel"
+    date = "2010-10-10"
 
-[modelB]
-date = "2003-04-05"
-submodel = ${modelA.submodel}
-```
+    [modelA.submodel]
+    @factory = "submodel"
+    value = 12
 
-and run the following command from the terminal
+    [modelB]
+    date = "2003-04-05"
+    submodel = ${modelA.submodel}
+    ```
 
-<div class="termy">
+    and run the following command from the terminal
 
-```console
-$ python script.py --config config.cfg --seed 42
-```
+    <div class="termy">
 
-</div>
+    ```console
+    $ python script.py --config config.cfg --seed 42
+    ```
+
+    </div>
+
+=== "YAML syntax"
+
+    ```yaml title="config.yaml"
+    script:
+      modelA: ${modelA}
+      modelB: ${modelB}
+
+    modelA:
+      "@factory": "bigmodel"
+      date: "2010-10-10"
+
+      submodel:
+        "@factory": "submodel"
+        value: 12
+
+    modelB:
+      date: "2003-04-05"
+      submodel: ${modelA.submodel}
+    ```
+
+    and run the following command from the terminal
+
+    <div class="termy">
+
+    ```console
+    $ python script.py --config config.yaml --seed 42
+    ```
+
+    </div>
+
 !!! tip "Naming"
 
     To use the name of your config path (e.g. `config-expe-2` if the configuration file is named `config-expe-2.cfg` *in* the configuration (after resolution), simply mention `name = None` under the section which title was provided at `@app.command(name=<section-title>)`

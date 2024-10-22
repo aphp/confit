@@ -6,6 +6,10 @@
 
 - Aborting a script will now show the traceback
 
+### Fixed
+
+- Confit should no longer cause pydantic v1 deprecation warnings
+
 ## v0.6.0 (2024-09-13)
 
 ### Fixed

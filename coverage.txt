@@ -3,8 +3,8 @@ Name                          Stmts   Miss   Cover   Missing
 confit/__init__.py                4      0 100.00%
 confit/cli.py                    80      0 100.00%
 confit/config.py                287      9  96.86%   101, 128, 346, 396, 476, 503, 539, 541, 590
-confit/errors.py                137      0 100.00%
-confit/registry.py              211      7  96.68%   118, 476-480, 506, 513
+confit/errors.py                138      0 100.00%
+confit/registry.py              213      7  96.71%   119, 479-483, 509, 516
 confit/utils/__init__.py          0      0 100.00%
 confit/utils/collections.py      32      0 100.00%
 confit/utils/eval.py             15      0 100.00%
@@ -12,4 +12,4 @@ confit/utils/random.py           38      0 100.00%
 confit/utils/settings.py         10      2  80.00%   11-12
 confit/utils/xjson.py           119      0 100.00%
 ------------------------------------------------------------
-TOTAL                           933     18  98.07%
+TOTAL                           936     18  98.08%

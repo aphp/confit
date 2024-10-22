@@ -168,6 +168,8 @@ class Cli(Typer):
                         print("Validation error:", file=sys.stderr, end=" ")
                         print(str(e), file=sys.stderr)
                     sys.exit(1)
+                except KeyboardInterrupt as e:  # pragma: no cover
+                    raise Exception("Interrupted by user") from e
 
             return validated
 

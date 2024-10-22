@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.7.0 (2024-10-22)
+
+### Changed
+
+- Aborting a script will now show the traceback
+
 ## v0.6.0 (2024-09-13)
 
 ### Fixed

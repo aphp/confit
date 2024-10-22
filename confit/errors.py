@@ -28,6 +28,7 @@ from confit.utils.collections import join_path
 from confit.utils.xjson import Reference
 
 Loc = Tuple[Union[int, str]]
+PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
 
 
 class MissingReference(Exception):
@@ -243,11 +244,11 @@ def patch_errors(
                 #     field_model.vd.model, pydantic.BaseModel
                 # ):
                 #     field_model = field_model.vd.model
-                if hasattr(field_model, "model_fields"):
-                    field_model = field_model.model_fields[part]
-                else:
+                if PYDANTIC_V1:
                     field_model = field_model.__fields__[part]
-                if hasattr(field_model, "type_"):
+                else:
+                    field_model = field_model.model_fields[part]
+                if PYDANTIC_V1:
                     field_model = field_model.type_
                 else:
                     field_model = field_model.annotation

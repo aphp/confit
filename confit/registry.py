@@ -55,11 +55,12 @@ def _resolve_and_validate_call(
         # "self" must be passed as a positional argument
         if use_self:
             kw = {**kw, self_name: resolved}
-        extras = [
-            key
-            for key in kw
-            if key not in pydantic_func.model.__fields__ and key != extras_name
-        ]
+        fields = (
+            pydantic_func.model.__fields__
+            if PYDANTIC_V1
+            else pydantic_func.model.model_fields
+        )
+        extras = [key for key in kw if key not in fields and key != extras_name]
         try:
             model_instance = pydantic_func.model(
                 **{
@@ -183,10 +184,10 @@ def validate_arguments(
             else:
                 vd = ValidatedFunction(_func.__init__, config)
             vd.model.__name__ = _func.__name__
-            if hasattr(vd.model, "model_fields"):
-                vd.model.model_fields["self"].default = None
-            else:
+            if PYDANTIC_V1:
                 vd.model.__fields__["self"].default = None
+            else:
+                vd.model.model_fields["self"].default = None
 
             # This function is called by Pydantic when asked to cast
             # a value (most likely a dict) as a Model (most often during
@@ -293,8 +294,10 @@ def validate_arguments(
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
             _func.vd = vd
-            _func.__get_validators__ = __get_validators__
-            _func.__get_pydantic_core_schema__ = __get_pydantic_core_schema__
+            if PYDANTIC_V1:
+                _func.__get_validators__ = __get_validators__
+            else:
+                _func.__get_pydantic_core_schema__ = __get_pydantic_core_schema__
             # _func.model = vd.model
             # _func.model.type_ = _func
             _func.__init__ = wrapper_function

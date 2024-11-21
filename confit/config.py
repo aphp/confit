@@ -172,7 +172,7 @@ class Config(dict):
             s = self.to_yaml_str()
         else:
             s = Config.to_str(self)
-        Path(path).write_text(s)
+        Path(path).write_text(s, encoding="utf-8")
 
     def serialize(self: Any):
         """

@@ -1,7 +1,7 @@
 import inspect
 import warnings
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Sequence, TypeVar
+from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
 
 import catalogue
 import pydantic
@@ -32,6 +32,7 @@ except ImportError:
     import importlib_metadata
 
 PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
+Func = TypeVar("Func")
 
 
 def _resolve_and_validate_call(
@@ -147,12 +148,12 @@ def _check_signature_for_save_params(func: Callable):
 
 
 def validate_arguments(
-    func: Optional[Callable] = None,
+    func: Optional[Func] = None,
     *,
     config: Dict = None,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
     registry: Any = None,
-) -> Any:
+) -> Union[Func, Callable[[Func], Func]]:
     """
     Decorator to validate the arguments passed to a function and store the result
     in a mapping from results to call parameters (allowing

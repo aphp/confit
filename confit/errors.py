@@ -163,7 +163,10 @@ def to_legacy_error(err: pydantic.ValidationError, model: Any) -> LegacyValidati
     errors = err.errors(include_url=False)
     raw_errors = []
     for err in errors:
-        vrepr = repr(err["input"])
+        try:
+            vrepr = repr(err["input"])
+        except Exception:  # pragma: no cover
+            vrepr = object.__repr__(err["input"])
         vrepr = vrepr[:50] + "..." if len(vrepr) > 50 else vrepr
         err = dict(err)
         msg = err.pop("msg", "")

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Force utf-8 encoding when writing a config file (ini or yaml)
+
 ## v0.7.0 (2024-10-22)
 
 ### Changed

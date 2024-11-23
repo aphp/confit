@@ -130,15 +130,15 @@ class Cli(Typer):
                         current = current.setdefault(part, Config())
                     current[parts[-1]] = v
                 try:
-                    resolved_config = Config(config[name]).resolve(
-                        registry=registry, root=config
-                    )
                     default_seed = model_fields.get("seed")
                     if default_seed is not None:
                         default_seed = default_seed.get_default()
                     seed = config.get(name, {}).get("seed", default_seed)
                     if seed is not None:
                         set_seed(seed)
+                    resolved_config = Config(config[name]).resolve(
+                        registry=registry, root=config
+                    )
                     if has_meta:
                         config_meta = dict(
                             config_path=config_path,

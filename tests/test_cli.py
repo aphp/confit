@@ -1,4 +1,5 @@
 import datetime
+import random
 
 import pytest
 from typer.testing import CliRunner
@@ -209,3 +210,31 @@ def test_fail_override(change_test_dir):
     assert result.exit_code == 1
     # CLI detects bool param for other which is converted to 1 since we expect an int
     assert "does not match any existing section in config" in str(result.exception)
+
+
+seed_app = Cli(pretty_exceptions_show_locals=False)
+
+
+@registry.factory.register("randmodel")
+class RandModel:
+    def __init__(self):
+        self.value = random.randint(0, 100000)
+
+
+@seed_app.command(name="seed", registry=registry)
+def print_seed(model: RandModel, seed: int):
+    print("Value:", model.value)
+
+
+def test_seed(change_test_dir):
+    """Checks that the program running twice will generate the same random numbers"""
+    result = runner.invoke(seed_app, ["--seed", "42", "--model.@factory", "randmodel"])
+    assert result.exit_code == 0, result.stdout
+    first_seed = int(result.stdout.split(":")[1].strip())
+
+    result = runner.invoke(seed_app, ["--seed", "42", "--model.@factory", "randmodel"])
+    assert result.exit_code == 0, result.stdout
+    second_seed = int(result.stdout.split(":")[1].strip())
+    print(first_seed, second_seed)
+
+    assert first_seed == second_seed

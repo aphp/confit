@@ -50,6 +50,7 @@ class Transformer(ast.NodeTransformer):
         "In",
         "NotIn",
         "Starred",
+        "IfExp",
     }
 
     def generic_visit(self, node):

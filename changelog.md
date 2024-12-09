@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Support interpolated seed in the config file (as a reminder, the seed is treated specifically by confit to initialize random generators **before** any object is resolved)
+- Support if/else expressions in interpolation, and only resolve the relevant branch
 
 ## v0.7.2 (2024-11-23)
 

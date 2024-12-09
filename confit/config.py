@@ -1,5 +1,7 @@
 import collections.abc
+import keyword
 import re
+from collections import UserDict
 from configparser import ConfigParser
 from io import StringIO
 from pathlib import Path
@@ -30,6 +32,30 @@ ID = r"[^\d\W]\w*"
 UNQUOTED_ID = rf"(?<![\'\"\w]){ID}(?![\'\"\w])"
 PATH_PART = rf"(?:'{ID}(?:[.]{ID})+'|\"{ID}(?:[.]{ID})+\"|{UNQUOTED_ID})"
 PATH = rf"{UNQUOTED_ID}(?:[.]{PATH_PART})*"
+
+
+class DynamicLocals(UserDict):
+    def __init__(self, mapping, root, resolved_locs, get):
+        super().__init__()
+        self.name_to_parts = {v: k for k, v in mapping.items()}
+        self.root = root
+        self.resolved_locs = resolved_locs
+        self.get = get
+
+    def __getitem__(self, item):
+        if not isinstance(item, str):
+            raise KeyError(item)
+        if item.startswith("__"):
+            raise KeyError(item)
+        current = self.root
+        parts = self.name_to_parts[item]
+        for part in parts:
+            current = current[part]
+        if id(current) not in self.resolved_locs:
+            resolved = self.get(current, parts)
+        else:
+            resolved = self.resolved_locs[id(current)]
+        return resolved
 
 
 class Config(dict):
@@ -341,12 +367,15 @@ class Config(dict):
 
                 path = match.group()
                 parts = split_path(path.rstrip(":"))
+
+                # Check if part is any special python keyword
+                if len(parts) == 1 and parts[0] in keyword.kwlist:
+                    return match.group()
                 try:
                     return local_names[parts] + ("." if path.endswith(":") else "")
                 except KeyError:
                     raise KeyError(path)
 
-            local_leaves = {}
             local_names = {}
             for match in pat.finditer(ref.value):
                 start = match.start()
@@ -354,15 +383,11 @@ class Config(dict):
                     continue
                 path = match.group()
                 parts = split_path(path.rstrip(":"))
-                current = root
-                for part in parts:
-                    current = current[part]
-                if id(current) not in resolved_locs:
-                    resolved = rec(current, parts)
-                else:
-                    resolved = resolved_locs[id(current)]
-                local_names[parts] = f"var_{len(local_leaves)}"
-                local_leaves[f"var_{len(local_leaves)}"] = resolved
+                if len(parts) == 1 and parts[0] in keyword.kwlist:
+                    continue
+                local_names.setdefault(parts, f"var_{len(local_names)}")
+
+            local_leaves = DynamicLocals(local_names, root, resolved_locs, rec)
 
             replaced = pat.sub(replace, ref.value)
 
@@ -439,7 +464,7 @@ class Config(dict):
                 while resolved is None:
                     try:
                         resolved = resolve_reference(obj)
-                    except KeyError:
+                    except (KeyError, NameError):
                         raise MissingReference(obj)
             else:
                 resolved = obj

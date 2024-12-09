@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Support interpolated seed in the config file (as a reminder, the seed is treated specifically by confit to initialize random generators **before** any object is resolved)
+
 ## v0.7.2 (2024-11-23)
 
 - Seed the program *BEFORE* the config file is resolved and components have been instantiated, to ensure reproducibility.

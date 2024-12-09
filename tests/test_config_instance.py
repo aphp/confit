@@ -657,3 +657,31 @@ ner:
     pollution: false
 """
     )
+
+
+def test_if_else():
+    config = Config.from_yaml_str(
+        """\
+params:
+    a: 1
+    cond: true
+    c: ${params.a if params.cond else params.b}
+"""
+    ).resolve()
+    assert config["params"]["c"] == 1
+
+
+def test_if_else_complex():
+    config = Config.from_yaml_str(
+        """\
+model:
+    "@factory": submodel
+    value: 12
+
+params:
+    a: 1
+    cond: true
+    c: ${model:value if model:hidden_value == 5 else params.b}
+"""
+    ).resolve(registry=registry)
+    assert config["params"]["c"] == 12

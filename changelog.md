@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.3 (2024-12-11)
 
 - Support interpolated seed in the config file (as a reminder, the seed is treated specifically by confit to initialize random generators **before** any object is resolved)
 - Support if/else expressions in interpolation, and only resolve the relevant branch

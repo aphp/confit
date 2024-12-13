@@ -145,7 +145,9 @@ class Config(dict):
         class ConfitYamlLoader(yaml.SafeLoader):
             def construct_object(self, x, deep=False):
                 if isinstance(x, yaml.ScalarNode):
-                    return loads(self.buffer[x.start_mark.index : x.end_mark.index])
+                    if x.style == '"' or x.style == "'":
+                        return loads(x.style + x.value + x.style)
+                    return loads(x.value)
                 return super().construct_object(x, deep)
 
         stream = StringIO(s)

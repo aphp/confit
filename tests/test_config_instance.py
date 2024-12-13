@@ -685,3 +685,34 @@ params:
 """
     ).resolve(registry=registry)
     assert config["params"]["c"] == 12
+
+
+def test_very_long_yaml_config():
+    config = Config.from_yaml_str(
+        """\
+        a: {}
+        """.format(
+            "x" * 4200
+        )
+    ).resolve(registry=registry)
+    assert config == {"a": "x" * 4200}
+
+
+def test_escaped_string():
+    config = Config.from_yaml_str(
+        """
+test:
+    a: "1"
+section:
+    num: 1
+    escaped_num: "1"
+    real_ref: ${test.a}
+    escaped_broken_ref: "${test.a"
+    escaped_ref: "${test.a}"
+"""
+    ).resolve(registry=registry)
+    assert config["section"]["num"] == 1
+    assert config["section"]["escaped_num"] == "1"
+    assert config["section"]["real_ref"] == "1"
+    assert config["section"]["escaped_broken_ref"] == "${test.a"
+    assert config["section"]["escaped_ref"] == "${test.a}"

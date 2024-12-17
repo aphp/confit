@@ -313,8 +313,7 @@ class Config(dict):
 
             def represent_str(self, data):
                 node = super().represent_scalar("tag:yaml.org,2002:str", data)
-                if set(",'\"{}[]$") & set(data):
-                    # node.value = dumps(data)
+                if set(",'\"{}[]$\n\t") & set(data):
                     node.style = "'" if data.count('"') > data.count("'") else '"'
                 return node
 

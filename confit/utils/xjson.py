@@ -165,7 +165,8 @@ def _encode_str(s):
     """Return an ASCII-only JSON representation of a Python string"""
     r = repr(s)
     if s.count('"') <= s.count("'") and r.startswith("'"):
-        r = '"' + s.replace('"', '\\"').replace("\\'", "'") + '"'
+        r = r[1:-1]
+        r = '"' + r.replace('"', '\\"').replace("\\'", "'") + '"'
     return r
 
 
@@ -294,4 +295,5 @@ def dumps(o: Any):
     -------
     str
     """
-    return "".join(_make_iterencode()(o))
+    res = "".join(_make_iterencode()(o))
+    return res

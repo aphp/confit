@@ -716,3 +716,28 @@ section:
     assert config["section"]["real_ref"] == "1"
     assert config["section"]["escaped_broken_ref"] == "${test.a"
     assert config["section"]["escaped_ref"] == "${test.a}"
+
+
+def test_newline_serialization():
+    config = Config(
+        {
+            "section": {
+                "string": "\tok\nok",
+            }
+        }
+    )
+    assert (
+        config.to_yaml_str()
+        == """\
+section:
+    string: "\\tok\\nok"
+"""
+    )
+    assert (
+        config.to_cfg_str()
+        == """\
+[section]
+string = "\\tok\\nok"
+
+"""
+    )

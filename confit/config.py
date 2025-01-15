@@ -461,10 +461,10 @@ class Config(dict):
             elif isinstance(obj, tuple):
                 resolved = tuple(rec(v, (*loc, i)) for i, v in enumerate(obj))
             elif isinstance(obj, Reference):
-                resolved = None
-                while resolved is None:
+                while True:
                     try:
                         resolved = resolve_reference(obj)
+                        break
                     except (KeyError, NameError):
                         raise MissingReference(obj)
             else:

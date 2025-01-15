@@ -1,11 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Allow larger than 4096 bytes config files
+- Escape tabs and newline when serializing to a config file
+- Fix an infinite loop that occured when resolving a reference to a field with a null value
+
 ## v0.7.3 (2024-12-11)
 
 - Support interpolated seed in the config file (as a reminder, the seed is treated specifically by confit to initialize random generators **before** any object is resolved)
 - Support if/else expressions in interpolation, and only resolve the relevant branch
-- Allow larger than 4096 bytes config files
-- Escape tabs and newline when serializing to a config file
 
 ## v0.7.2 (2024-11-23)
 

@@ -741,3 +741,14 @@ string = "\\tok\\nok"
 
 """
     )
+
+
+def test_null_reference():
+    config = Config.from_yaml_str(
+        """
+test:
+    a: null
+    b: ${test.a}
+"""
+    ).resolve(registry=registry)
+    assert config["test"]["b"] is None

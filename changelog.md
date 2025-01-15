@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.4 (2025-01-15)
 
 - Allow larger than 4096 bytes config files
 - Escape tabs and newline when serializing to a config file

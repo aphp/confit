@@ -80,7 +80,7 @@ class Config(dict):
         if len(args) == 1 and isinstance(args[0], dict):
             assert len(kwargs) == 0
             kwargs = args[0]
-        super().__init__(**kwargs)
+        super().__init__(kwargs)
 
     @classmethod
     def from_cfg_str(cls, s: str, resolve: bool = False, registry: Any = None) -> Any:
@@ -427,7 +427,7 @@ class Config(dict):
                 registries = [
                     (key, value, getattr(registry, key[1:]))
                     for key, value in resolved.items()
-                    if key.startswith("@")
+                    if isinstance(key, str) and key.startswith("@")
                 ]
                 assert (
                     len(registries) <= 1
@@ -516,8 +516,8 @@ class Config(dict):
 
                 old_val = old[key]
                 if isinstance(old_val, dict) and isinstance(new_val, dict):
-                    old_resolver = next((k for k in old_val if k.startswith("@")), None)
-                    new_resolver = next((k for k in new_val if k.startswith("@")), None)
+                    old_resolver = next((k for k in old_val if isinstance(key, str) and k.startswith("@")), None)
+                    new_resolver = next((k for k in new_val if isinstance(key, str) and k.startswith("@")), None)
                     if (
                         new_resolver is not None
                         and old_resolver is not None

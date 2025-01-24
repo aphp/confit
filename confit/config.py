@@ -516,8 +516,14 @@ class Config(dict):
 
                 old_val = old[key]
                 if isinstance(old_val, dict) and isinstance(new_val, dict):
-                    old_resolver = next((k for k in old_val if isinstance(key, str) and k.startswith("@")), None)
-                    new_resolver = next((k for k in new_val if isinstance(key, str) and k.startswith("@")), None)
+                    old_resolver = next(
+                        (k for k in old_val if isinstance(key, str) and k.startswith("@")),
+                        None,
+                    )
+                    new_resolver = next(
+                        (k for k in new_val if isinstance(key, str) and k.startswith("@")),
+                        None,
+                    )
                     if (
                         new_resolver is not None
                         and old_resolver is not None

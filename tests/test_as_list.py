@@ -13,21 +13,6 @@ if pydantic.VERSION >= "2":
     from pydantic_core import core_schema
 
 
-class Validated:
-    @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
-
-    @classmethod
-    def __get_pydantic_core_schema__(cls, source, handler):
-        return core_schema.chain_schema(
-            [
-                core_schema.no_info_plain_validator_function(v)
-                for v in cls.__get_validators__()
-            ]
-        )
-
-
 class MetaAsList(type):
     def __init__(cls, name, bases, dct):
         super().__init__(name, bases, dct)
@@ -110,7 +95,7 @@ def test_as_list():
         func("a")
 
     assert (
-        "1 validation error for test_as_list.test_as_list.<locals>.func()\n" "-> a.0\n"
+        "1 validation error for test_as_list.test_as_list.<locals>.func()\n-> a.0\n"
     ) in str(e.value)
 
 

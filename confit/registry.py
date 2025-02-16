@@ -1,20 +1,25 @@
 import inspect
 import warnings
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Sequence, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+)
 
 import catalogue
 import pydantic
-
-from confit.utils.settings import is_debug
-
-try:
-    from pydantic.decorator import ValidatedFunction
-except ImportError:
-    from pydantic.deprecated.decorator import ValidatedFunction
 from pydantic import ValidationError
+from typing_extensions import ParamSpec
 
 from confit.config import Config
+from confit.draft import Draft, Draftable
 from confit.errors import (
     ConfitValidationError,
     LegacyValidationError,
@@ -25,6 +30,15 @@ from confit.errors import (
     remove_lib_from_traceback,
     to_legacy_error,
 )
+from confit.utils.settings import is_debug
+
+try:
+    from pydantic.decorator import ValidatedFunction
+except ImportError:
+    from pydantic.deprecated.decorator import ValidatedFunction
+
+if pydantic.VERSION >= "2":
+    pass
 
 try:
     import importlib.metadata as importlib_metadata
@@ -32,7 +46,6 @@ except ImportError:
     import importlib_metadata
 
 PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
-Func = TypeVar("Func")
 
 
 def _resolve_and_validate_call(
@@ -147,20 +160,45 @@ def _check_signature_for_save_params(func: Callable):
         raise SignatureError(func)
 
 
+P = ParamSpec("P")
+R = TypeVar("R", covariant=True)
+
+
+@overload
 def validate_arguments(
-    func: Optional[Func] = None,
+    func: Callable[P, R],
     *,
     config: Dict = None,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
     registry: Any = None,
-) -> Union[Func, Callable[[Func], Func]]:
+) -> Draftable[P, R]:
+    ...
+
+
+@overload
+def validate_arguments(
+    *,
+    config: Dict = None,
+    invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
+    registry: Any = None,
+) -> Callable[[Callable[P, R]], Draftable[P, R]]:
+    ...
+
+
+def validate_arguments(
+    func: Optional[Callable[P, R]] = None,
+    *,
+    config: Dict = None,
+    invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
+    registry: Any = None,
+) -> Callable[[Callable[P, R]], Draftable[P, R]]:
     """
     Decorator to validate the arguments passed to a function and store the result
     in a mapping from results to call parameters (allowing
 
     Parameters
     ----------
-    func: Callable
+    func: Optional[Callable[P, R]]
         The function or class to call
     config: Dict
         The validation configuration object
@@ -171,7 +209,7 @@ def validate_arguments(
 
     Returns
     -------
-    Any
+    Callable[[Callable[P, R]], Draftable[P, R]]:
     """
     if config is None:
         config = {}
@@ -294,6 +332,34 @@ def validate_arguments(
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
+            required_kw_params = inspect.signature(vd.raw_function).parameters
+            required_kw_params = {
+                k
+                for k, v in required_kw_params.items()
+                if v.default is v.empty
+                if v.kind != v.VAR_KEYWORD
+                and v.kind != v.POSITIONAL_ONLY
+                and v != v.VAR_POSITIONAL
+                and k != "self"
+            }
+
+            @wraps(
+                vd.raw_function,
+                assigned=(
+                    "__module__",
+                    "__name__",
+                    "__qualname__",
+                    "__doc__",
+                    "__annotations__",
+                    "__defaults__",
+                    "__kwdefaults__",
+                ),
+            )
+            def draft(**kwargs):
+                if all(k in kwargs for k in required_kw_params):
+                    return _func(**kwargs)
+                return Draft(_func, kwargs)
+
             _func.vd = vd
             if PYDANTIC_V1:
                 _func.__get_validators__ = __get_validators__
@@ -303,6 +369,7 @@ def validate_arguments(
             # _func.model.type_ = _func
             _func.__init__ = wrapper_function
             _func.__init__.__wrapped__ = vd.raw_function
+            _func.draft = draft
             return _func
 
         else:
@@ -339,10 +406,38 @@ def validate_arguments(
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
+            required_kw_params = inspect.signature(vd.raw_function).parameters
+            required_kw_params = {
+                k
+                for k, v in required_kw_params.items()
+                if v.default is v.empty
+                if v.kind != v.VAR_KEYWORD
+                and v.kind != v.POSITIONAL_ONLY
+                and v != v.VAR_POSITIONAL
+            }
+
+            @wraps(
+                vd.raw_function,
+                assigned=(
+                    "__module__",
+                    "__name__",
+                    "__qualname__",
+                    "__doc__",
+                    "__annotations__",
+                    "__defaults__",
+                    "__kwdefaults__",
+                ),
+            )
+            def draft(**kwargs):
+                if all(k in kwargs for k in required_kw_params):
+                    return _func(**kwargs)
+                return Draft(_func, kwargs)
+
             wrapper_function.vd = vd  # type: ignore
             wrapper_function.validate = vd.init_model_instance  # type: ignore
             wrapper_function.__wrapped__ = vd.raw_function  # type: ignore
             wrapper_function.model = vd.model  # type: ignore
+            wrapper_function.draft = draft
             return wrapper_function
 
     if func:
@@ -385,16 +480,71 @@ class Registry(catalogue.Registry):
         super().__init__(namespace, entry_points=entry_points)
         self.registry = None
 
+    @overload
     def register(
         self,
         name: str,
         *,
-        func: Optional[catalogue.InFunc] = None,
+        func: Callable[P, R],
         save_params: Optional[Dict[str, Any]] = None,
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-    ) -> Callable[[catalogue.InFunc], catalogue.InFunc]:
+        auto_draft_in_config: bool = False,
+    ) -> Draftable[P, R]:
+        ...
+
+    @overload
+    def register(
+        self,
+        name: str,
+        *,
+        func: Type[R],
+        save_params: Optional[Dict[str, Any]] = None,
+        skip_save_params: Sequence[str] = (),
+        invoker: Optional[Callable] = None,
+        deprecated: Sequence[str] = (),
+        auto_draft_in_config: bool = False,
+    ) -> Union[Type[R], Draftable[Any, R]]:
+        ...
+
+    @overload
+    def register(
+        self,
+        name: str,
+        *,
+        save_params: Optional[Dict[str, Any]] = None,
+        skip_save_params: Sequence[str] = (),
+        invoker: Optional[Callable] = None,
+        deprecated: Sequence[str] = (),
+        auto_draft_in_config: bool = False,
+    ) -> Callable[[Callable[P, R]], Draftable[P, R]]:
+        ...
+
+    @overload
+    def register(
+        self,
+        name: str,
+        *,
+        save_params: Optional[Dict[str, Any]] = None,
+        skip_save_params: Sequence[str] = (),
+        invoker: Optional[Callable] = None,
+        deprecated: Sequence[str] = (),
+        auto_draft_in_config: bool = False,
+    ) -> Callable[[Type[R]], Union[Type[R], Draftable[Any, R]]]:
+        ...
+
+    def register(
+        self,
+        name: str,
+        *,
+        func: Optional[Union[Callable[P, R], Type[R]]] = None,
+        save_params: Optional[Dict[str, Any]] = None,
+        skip_save_params: Sequence[str] = (),
+        invoker: Optional[Callable] = None,
+        deprecated: Sequence[str] = (),
+        auto_draft_in_config: bool = False,
+    ) -> Callable[[Callable[P, R]], Draftable[P, R]]:
         """
         This is a convenience wrapper around `catalogue.Registry.register`, that
         additionally validates the input arguments of the registered function and
@@ -404,7 +554,7 @@ class Registry(catalogue.Registry):
         ----------
         name: str
             The name of the function
-        func: Optional[catalogue.InFunc]
+        func: Optional[Func]
             The function to register
         save_params: Optional[Dict[str, Any]]
             Additional parameters to save when the function is called. If falsy,
@@ -418,10 +568,17 @@ class Registry(catalogue.Registry):
             validating its parameters.
         deprecated: Sequence[str]
             The deprecated registry names for the function
+        auto_draft_in_config: bool
+            Allow to call the function with some mandatory parameters missing. This is
+            useful when a given parameter is not known by the user but computed later,
+            right before the factory is called.
+
+            If true and some mandatory parameters are missing, a Partial object is
+            returned.
 
         Returns
         -------
-        Callable[[catalogue.InFunc], catalogue.InFunc]
+        Callable[[Func], Func]
         """
         registerer = super().register
 
@@ -436,7 +593,7 @@ class Registry(catalogue.Registry):
                 Config._store_resolved(resolved, params_to_save)
             return resolved
 
-        def wrap_and_register(fn: catalogue.InFunc) -> catalogue.InFunc:
+        def wrap_and_register(fn: Callable[P, R]) -> Draftable[P, R]:
             if save_params is not None:
                 _check_signature_for_save_params(
                     fn if not isinstance(fn, type) else fn.__init__
@@ -448,7 +605,11 @@ class Registry(catalogue.Registry):
                 registry=getattr(self, "registry", None),
                 invoker=invoke,
             )
-            registerer(name)(validated_fn)
+
+            if auto_draft_in_config:
+                registerer(name)(validated_fn.draft)
+            else:
+                registerer(name)(validated_fn)
 
             for deprecated_name in deprecated:
 
@@ -498,7 +659,7 @@ class Registry(catalogue.Registry):
 
         Returns
         -------
-        catalogue.InFunc
+        Func
         """
         path = list(self.namespace) + [name]
         try:

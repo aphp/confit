@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- Added `auto_draft_in_config` parameter to `register(...)` function. This is meant for functions that can only be partially be instantiated by a user, because a required parameter will be provided by the library later.
+
+  For instance:
+
+  - EDS-NLP's `ScheduledOptimizer` requires the pipeline parameters, which depends on the pipeline being trained
+  - EDS-NLP's local trackers (like `csv` and `json`) require `logging_dir` which might be defined in the `edsnlp.train` function.
+
+  If a callable registered with `auto_draft_in_config=True` is resolved with missing required parameters, a `Draft[ReturnType]` class is returned.
+  This class can then be instantiated via the draft.instantiate method.
+  We don't instantiate a Draft class via the `__call__` method to avoid users mistakenly proceeding with a non instantiated class.
+  Instead, whenever a Draft an attribute or a method is requested on Draft class, outside the Draft few specific attrs/methods,
+  a message error is displayed explaining how this object is not instantiated yet.
+
+  The user can also explicitly instantiate the Draft object via the `Class.draft` method for classes that have been wrapped with `validate_arguments`.
+
+- Added a `Validatable` class that can be inherited from to run a `validate` class method whenever the class is validated
+
+
 ## v0.7.5 (2025-03-21)
 
 - Allow non-string keys in config files
@@ -8,7 +28,7 @@
 
 - Allow larger than 4096 bytes config files
 - Escape tabs and newline when serializing to a config file
-- Fix an infinite loop that occured when resolving a reference to a field with a null value
+- Fix an infinite loop that occurred when resolving a reference to a field with a null value
 
 ## v0.7.3 (2024-12-11)
 

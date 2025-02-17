@@ -5,7 +5,7 @@ import pytest
 from pydantic import StrictBool
 from typing_extensions import Literal
 
-from confit import Config, Registry
+from confit import Config, Registry, Validatable
 from confit.errors import ConfitValidationError
 from confit.registry import (
     PYDANTIC_V1,
@@ -112,6 +112,32 @@ def test_custom_validators_v2():
             from pydantic_core import core_schema
 
             return core_schema.no_info_plain_validator_function(cls.validate)
+
+    @validate_arguments()
+    def fn(value: ModelWithCustomValidation):
+        return value.desc
+
+    assert (
+        fn(
+            value=dict(
+                value=3,
+            )
+        )
+        == "Custom validation done"
+    )
+
+
+def test_custom_validators_validatable():
+    class ModelWithCustomValidation(Validatable):
+        def __init__(self, value: float, desc: str = ""):
+            self.value = value
+            self.desc = desc
+
+        @classmethod
+        def validate(cls, value: float):
+            if isinstance(value, dict):
+                value["desc"] = "Custom validation done"
+            return ModelWithCustomValidation(**value)
 
     @validate_arguments()
     def fn(value: ModelWithCustomValidation):

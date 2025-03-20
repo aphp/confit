@@ -119,16 +119,11 @@ class Config(dict):
             current.clear()
             errors = []
             for k, v in parser.items(section):
-                path = split_path(k)
-                for part in path[:-1]:
-                    if part not in current:
-                        current[part] = current = Config()
-                    else:
-                        current = current[part]
+                parsed_k = loads(k)
                 try:
-                    current[path[-1]] = loads(v)
+                    current[parsed_k] = loads(v)
                 except ValueError as e:
-                    errors.append(ErrorWrapper(e, loc=path))
+                    errors.append(ErrorWrapper(e, loc=parsed_k))
 
             if errors:
                 raise ConfitValidationError(errors=errors)

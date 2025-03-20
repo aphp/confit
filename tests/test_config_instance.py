@@ -510,6 +510,7 @@ def test_partial_interpolation():
     assert isinstance(model.submodel, SubModel)
 
 
+@pytest.mark.xfail(reason="Deprecated feature")
 def test_deep_key():
     config = Config.from_str(
         """
@@ -752,3 +753,39 @@ test:
 """
     ).resolve(registry=registry)
     assert config["test"]["b"] is None
+
+
+def test_yaml_non_str_keys():
+    config = Config.from_yaml_str(
+        """
+section:
+    1: "ok"
+    False: "ok"
+    "12": "ok"
+"""
+    )
+    expected = {
+        1: "ok",
+        False: "ok",
+        "12": "ok",
+    }
+    assert config["section"] == expected
+    assert Config.from_yaml_str(config.to_yaml_str())["section"] == expected
+
+
+def test_cfg_non_str_keys():
+    config = Config.from_cfg_str(
+        """
+[section]
+1 = "ok"
+False = "ok"
+"12" = "ok"
+"""
+    )
+    expected = {
+        1: "ok",
+        False: "ok",
+        "12": "ok",
+    }
+    assert config["section"] == expected
+    # assert Config.from_cfg_str(config.to_cfg_str())["section"] == expected

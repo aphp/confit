@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.5 (2025-03-21)
+
+- Allow non-string keys in config files
+
 ## v0.7.4 (2025-01-15)
 
 - Allow larger than 4096 bytes config files

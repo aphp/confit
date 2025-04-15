@@ -111,7 +111,7 @@ class XJsonTransformer(Transformer):
     def reference(self, tree: Tree):
         """Parse reference"""
         meta = tree[0].meta
-        return Reference(self.input_string[meta.start_pos : meta.end_pos])
+        return Reference(self.input_string[meta.start_pos : meta.end_pos].strip())
 
     list = list
     tuple = tuple

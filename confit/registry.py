@@ -218,10 +218,10 @@ def validate_arguments(
     def validate(_func: Callable) -> Callable:
         if isinstance(_func, type):
             _func: type
-            if hasattr(_func.__init__, "__wrapped__"):
-                vd = ValidatedFunction(_func.__init__.__wrapped__, config)
-            else:
-                vd = ValidatedFunction(_func.__init__, config)
+            vd = _func.__init__
+            while hasattr(vd, "__wrapped__"):
+                vd = vd.__wrapped__
+            vd = ValidatedFunction(vd, config)
             vd.model.__name__ = _func.__name__
             if PYDANTIC_V1:
                 vd.model.__fields__["self"].default = None

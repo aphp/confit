@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.8.0 (2025-04-15)
 
 - Added `auto_draft_in_config` parameter to `register(...)` function. This is meant for functions that can only be partially be instantiated by a user, because a required parameter will be provided by the library later.
 

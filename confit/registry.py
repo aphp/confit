@@ -171,8 +171,7 @@ def validate_arguments(
     config: Dict = None,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
     registry: Any = None,
-) -> Draftable[P, R]:
-    ...
+) -> Draftable[P, R]: ...
 
 
 @overload
@@ -181,8 +180,7 @@ def validate_arguments(
     config: Dict = None,
     invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]] = None,
     registry: Any = None,
-) -> Callable[[Callable[P, R]], Draftable[P, R]]:
-    ...
+) -> Callable[[Callable[P, R]], Draftable[P, R]]: ...
 
 
 def validate_arguments(
@@ -223,6 +221,7 @@ def validate_arguments(
                 vd = vd.__wrapped__
             vd = ValidatedFunction(vd, config)
             vd.model.__name__ = _func.__name__
+            vd.raw_function = _func.__init__
             if PYDANTIC_V1:
                 vd.model.__fields__["self"].default = None
             else:
@@ -491,8 +490,7 @@ class Registry(catalogue.Registry):
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
         auto_draft_in_config: bool = False,
-    ) -> Draftable[P, R]:
-        ...
+    ) -> Draftable[P, R]: ...
 
     @overload
     def register(
@@ -505,8 +503,7 @@ class Registry(catalogue.Registry):
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
         auto_draft_in_config: bool = False,
-    ) -> Union[Type[R], Draftable[Any, R]]:
-        ...
+    ) -> Union[Type[R], Draftable[Any, R]]: ...
 
     @overload
     def register(
@@ -518,8 +515,7 @@ class Registry(catalogue.Registry):
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
         auto_draft_in_config: bool = False,
-    ) -> Callable[[Callable[P, R]], Draftable[P, R]]:
-        ...
+    ) -> Callable[[Callable[P, R]], Draftable[P, R]]: ...
 
     @overload
     def register(
@@ -531,8 +527,7 @@ class Registry(catalogue.Registry):
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
         auto_draft_in_config: bool = False,
-    ) -> Callable[[Type[R]], Union[Type[R], Draftable[Any, R]]]:
-        ...
+    ) -> Callable[[Type[R]], Union[Type[R], Draftable[Any, R]]]: ...
 
     def register(
         self,
@@ -667,7 +662,9 @@ class Registry(catalogue.Registry):
         except catalogue.RegistryError:
             if self.entry_points:
                 from_entry_point = self.get_entry_point(name)
-                if from_entry_point:
+                if catalogue.check_exists(*path):
+                    return catalogue._get(path)
+                elif from_entry_point:
                     return from_entry_point
             if not catalogue.check_exists(*path):
                 raise catalogue.RegistryError(

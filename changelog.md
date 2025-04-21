@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.9.0 (2025-05-15)
+
+- Fix calling @validate_arguments on classes with wrapped `__init__` functions (e.g. accelerate loggers)
+- Enforce `auto_draft_in_config` parameter when a function is imported via entry points (i.e., apply precedence to function passed to `Registry.register`, instead of the one got from the entry point)
+
 ## v0.8.0 (2025-04-15)
 
 - Added `auto_draft_in_config` parameter to `register(...)` function. This is meant for functions that can only be partially be instantiated by a user, because a required parameter will be provided by the library later.

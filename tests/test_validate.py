@@ -1,4 +1,5 @@
 import datetime
+import functools
 import os
 
 import pytest
@@ -433,3 +434,26 @@ def test_deprecated():
     assert items[0].message.args[0] == (
         '"my-model-old" is deprecated, please use "my-model" instead."'
     )
+
+
+def test_wrapped_init():
+    value = 5
+    def decorator(func):
+
+        @functools.wraps(func)
+        def wrapped(self, *args, **kwargs):
+            nonlocal value
+            value += 1
+            return func(self, *args, **kwargs)
+
+        return wrapped
+
+    @validate_arguments()
+    class MyClass:
+        @decorator
+        def __init__(self, value: int):
+            self.value = value
+
+    obj = MyClass(10)
+    assert obj.value == 10
+    assert value == 6  # 5 + 1 from the decorator

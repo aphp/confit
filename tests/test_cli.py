@@ -4,7 +4,7 @@ import random
 import pytest
 from typer.testing import CliRunner
 
-from confit import Cli, Registry
+from confit import Cli, Config, Registry
 from confit.registry import PYDANTIC_V1, RegistryCollection, set_default_registry
 
 runner = CliRunner()
@@ -238,3 +238,205 @@ def test_seed(change_test_dir):
     print(first_seed, second_seed)
 
     assert first_seed == second_seed
+
+
+# Tests for default_config parameter
+default_config_app = Cli(pretty_exceptions_show_locals=False)
+
+default_config = Config(
+    {
+        "script": {
+            "modelA": {
+                "@factory": "bigmodel",
+                "date": "2020-01-01",
+                "submodel": {
+                    "@factory": "submodel",
+                    "value": 42,
+                    "desc": "default description",
+                },
+            },
+            "modelB": {
+                "@factory": "bigmodel",
+                "date": "2020-02-02",
+                "submodel": {
+                    "@factory": "submodel",
+                    "value": 24,
+                    "desc": "another default",
+                },
+            },
+            "other": 100,
+            "seed": 1337,
+        }
+    }
+)
+
+
+@default_config_app.command(
+    name="script", registry=registry, default_config=default_config
+)
+def function_with_default_config(
+    modelA: BigModel, modelB: BigModel, other: int, seed: int
+):
+    print(f"ModelA date: {modelA.date}")
+    print(f"ModelA value: {modelA.submodel.value}")
+    print(f"ModelB date: {modelB.date}")
+    print(f"ModelB value: {modelB.submodel.value}")
+    print(f"Other: {other}")
+    print(f"Seed: {seed}")
+
+
+def test_cli_with_default_config():
+    """Test that default_config is used when no config file is provided"""
+    result = runner.invoke(default_config_app, [])
+    assert result.exit_code == 0, result.stdout
+    assert "ModelA date: 2020-01-01" in result.stdout
+    assert "ModelA value: 42.0" in result.stdout
+    assert "ModelB date: 2020-02-02" in result.stdout
+    assert "ModelB value: 24.0" in result.stdout
+    assert "Other: 100" in result.stdout
+    assert "Seed: 1337" in result.stdout
+
+
+def test_cli_with_default_config_override():
+    """Test that command line overrides work with default_config"""
+    result = runner.invoke(
+        default_config_app,
+        ["--other", "200", "--modelA.submodel.value", "99"],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "ModelA value: 99.0" in result.stdout
+    assert "Other: 200" in result.stdout
+    # Other values should remain from default config
+    assert "ModelA date: 2020-01-01" in result.stdout
+    assert "ModelB date: 2020-02-02" in result.stdout
+
+
+# Tests for merge_with_default_config parameter
+merge_config_app = Cli(pretty_exceptions_show_locals=False)
+
+base_config = Config(
+    {
+        "script": {
+            "modelA": {
+                "@factory": "bigmodel",
+                "date": "2019-01-01",
+                "submodel": {
+                    "@factory": "submodel",
+                    "value": 10,
+                    "desc": "base description",
+                },
+            },
+            "other": 50,
+            "seed": 999,
+        }
+    }
+)
+
+
+@merge_config_app.command(
+    name="script",
+    registry=registry,
+    default_config=base_config,
+    merge_with_default_config=True,
+)
+def function_with_merge_config(
+    modelA: BigModel, modelB: BigModel, other: int, seed: int
+):
+    print(f"ModelA date: {modelA.date}")
+    print(f"ModelA value: {modelA.submodel.value}")
+    print(f"ModelA desc: {modelA.submodel.desc}")
+    print(f"ModelB date: {modelB.date}")
+    print(f"ModelB value: {modelB.submodel.value}")
+    print(f"Other: {other}")
+    print(f"Seed: {seed}")
+
+
+def test_cli_merge_with_default_config(tmp_path):
+    """Test that merge_with_default_config merges provided config with default"""
+    # Create a temporary config file that only partially defines the configuration
+    config_file = tmp_path / "partial_config.cfg"
+    config_file.write_text("""
+[script]
+other = 75
+
+[script.modelB]
+@factory = "bigmodel"
+date = "2021-12-31"
+
+[script.modelB.submodel]
+@factory = "submodel"
+value = 33
+desc = "partial config"
+""")
+
+    result = runner.invoke(merge_config_app, ["--config", str(config_file)])
+    assert result.exit_code == 0, result.stdout
+
+    # Values from config file should override default
+    assert "Other: 75" in result.stdout
+    assert "ModelB date: 2021-12-31" in result.stdout
+    assert "ModelB value: 33.0" in result.stdout
+
+    # Values not in config file should come from default
+    assert "ModelA date: 2019-01-01" in result.stdout
+    assert "ModelA value: 10.0" in result.stdout
+    assert "ModelA desc: base description" in result.stdout
+    assert "Seed: 999" in result.stdout
+
+
+def test_cli_merge_with_default_config_no_merge_flag(tmp_path):
+    """Test that without merge_with_default_config=True, default config is not merged"""
+    no_merge_app = Cli(pretty_exceptions_show_locals=False)
+
+    @no_merge_app.command(
+        name="script",
+        registry=registry,
+        default_config=base_config,
+        merge_with_default_config=False,  # Explicitly set to False
+    )
+    def function_no_merge(modelA: BigModel, modelB: BigModel, other: int, seed: int):
+        print(f"ModelA date: {modelA.date}")
+        print(f"Other: {other}")
+
+    # Create a config file that doesn't have modelA defined
+    config_file = tmp_path / "incomplete_config.cfg"
+    config_file.write_text("""
+[script]
+other = 80
+seed = 123
+
+[script.modelB]
+@factory = "bigmodel"
+date = "2022-01-01"
+
+[script.modelB.submodel]
+@factory = "submodel"
+value = 44
+""")
+
+    result = runner.invoke(no_merge_app, ["--config", str(config_file)])
+    # This should fail because modelA is not defined and we're not merging
+    # with default
+    assert result.exit_code == 1
+    assert (
+        "field required" in str(result.stdout)
+        or "field required" in str(result.exception)
+        or "modelA" in str(result.exception)
+    )
+
+
+def test_cli_default_config_with_command_line_override():
+    """Test that command line arguments can override specific parts of default config"""
+    result = runner.invoke(
+        default_config_app,
+        [
+            "--modelA.date",
+            "2023-06-15",
+            "--modelB.submodel.desc",
+            "overridden description",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "ModelA date: 2023-06-15" in result.stdout
+    # ModelB desc is not printed in this function
+    assert "overridden description" not in result.stdout

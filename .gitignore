@@ -1,5 +1,7 @@
 # Python
 __pycache__/
+.ruff_cache
+.mypy_cache
 
 # DS Store
 .DS_Store

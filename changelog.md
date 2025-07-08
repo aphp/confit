@@ -4,6 +4,7 @@
 
 - Fix calling @validate_arguments on classes with wrapped `__init__` functions (e.g. accelerate loggers)
 - Enforce `auto_draft_in_config` parameter when a function is imported via entry points (i.e., apply precedence to function passed to `Registry.register`, instead of the one got from the entry point)
+- Add `default_config` option in CLI decorator
 
 ## v0.8.0 (2025-04-15)
 

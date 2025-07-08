@@ -77,6 +77,8 @@ class Cli(Typer):
         # Rich settings
         rich_help_panel: Union[str, None] = Default(None),
         registry: Any = None,
+        default_config: Optional[Config] = None,
+        merge_with_default_config: bool = False,
     ) -> Callable[[CommandFunctionType], CommandFunctionType]:
         typer_command = super().command(
             name=name,
@@ -107,8 +109,12 @@ class Cli(Typer):
                 has_meta = _fn_has_meta(fn)
                 if config_path:
                     config, name_from_file = merge_from_disk(config_path)
+                elif default_config is not None:
+                    config = default_config
                 else:
                     config = Config({name: {}})
+                if default_config is not None and merge_with_default_config:
+                    config = Config(default_config).merge(config)
                 model_fields = (
                     validated.model.model_fields
                     if hasattr(validated.model, "model_fields")

@@ -355,8 +355,6 @@ def validate_arguments(
                 ),
             )
             def draft(**kwargs):
-                if all(k in kwargs for k in required_kw_params):
-                    return _func(**kwargs)
                 return Draft(_func, kwargs)
 
             _func.vd = vd
@@ -576,6 +574,12 @@ class Registry(catalogue.Registry):
         Callable[[Func], Func]
         """
         registerer = super().register
+
+        if auto_draft_in_config:
+            warnings.warn(
+                "`auto_draft_in_config` is deprecated, prefer explicitly "
+                "creating drafts using '@registry = name !draft'"
+            )
 
         save_params = save_params or {f"@{self.namespace[-1]}": name}
 

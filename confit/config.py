@@ -10,6 +10,7 @@ from weakref import WeakKeyDictionary
 
 import pydantic_core
 
+from confit.draft import Draft
 from confit.errors import (
     ConfitValidationError,
     CyclicReferenceError,
@@ -429,12 +430,20 @@ class Config(dict):
                 ), f"Cannot resolve using multiple registries at {'.'.join(loc)}"
 
                 if len(registries) == 1:
+                    raw_key, value, registry_value = registries[0]
                     cfg = resolved
                     params = dict(resolved)
-                    params.pop(registries[0][0])
-                    fn = registries[0][2].get(registries[0][1])
+                    params.pop(raw_key)
+                    value = value.strip()
+                    is_draft = value.endswith("!draft")
+                    if is_draft:
+                        value = value[:-len("!draft")].strip()
+                    fn = registry_value.get(value)
                     try:
-                        resolved = fn(**params)
+                        if is_draft:
+                            resolved = Draft(fn, params)
+                        else:
+                            resolved = fn(**params)
                         # The `validate_arguments` decorator has most likely
                         # already put the resolved config in the registry
                         # but for components that are instantiated without it

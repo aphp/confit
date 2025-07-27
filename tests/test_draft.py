@@ -13,7 +13,7 @@ class Custom:
         pass
 
 
-def test_draft_from_config(registry):
+def test_draft_from_config_with_auto_draft(registry):
     @registry.misc_bis.register("partial", auto_draft_in_config=True)
     def partial_function(required_val: int, param: int = 3) -> Custom:
         return Custom(required_val + param)
@@ -21,6 +21,32 @@ def test_draft_from_config(registry):
     config = """
 [model]
 @misc_bis = "partial"
+param = 3
+"""
+    obj = Config().from_str(config).resolve(registry=registry)["model"]
+    assert isinstance(obj, Draft)
+    with pytest.raises(TypeError):
+        obj.foo()
+    with pytest.raises(TypeError):
+        obj()
+    with pytest.raises(TypeError):
+        obj + 5
+    assert Draft.instantiate(obj, required_val=2).value == 5
+
+    obj2 = partial_function(param=5, required_val=2)
+    assert obj2.value == 7
+
+    assert Draft.instantiate(obj2, required_val=2).value == 7
+
+
+def test_draft_from_config_explicit(registry):
+    @registry.misc_bis.register("partial_explicit")
+    def partial_function(required_val: int, param: int = 3) -> Custom:
+        return Custom(required_val + param)
+
+    config = """
+[model]
+@misc_bis = partial !draft
 param = 3
 """
     obj = Config().from_str(config).resolve(registry=registry)["model"]
@@ -77,7 +103,7 @@ def test_draft_from_type(registry):
             self.value = value
 
     MyClass = registry.misc_bis.register("partial", auto_draft_in_config=True)(MyClass)
-    assert MyClass.draft(value=3).value == 3
+    assert isinstance(MyClass.draft(value=3), Draft)
 
     obj = MyClass.draft()
     assert str(obj) == "Draft[test_draft_from_type.<locals>.MyClass]"

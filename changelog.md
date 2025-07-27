@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Deprecate `auto_draft_in_config`, in favor of explicitly using
+  ```
+  @registry: myname !draft
+  ```
+  to define a draft object
+- :boom: Even if a `MyClass.draft(...)` instantiation contains all required parameter, it will still return a draft. `draft.instantiate` must be called to instantiate the actual object.
+
 ## v0.9.0 (2025-05-15)
 
 - Fix calling @validate_arguments on classes with wrapped `__init__` functions (e.g. accelerate loggers)

@@ -355,7 +355,7 @@ def validate_arguments(
                 ),
             )
             def draft(**kwargs):
-                return Draft(_func, kwargs)
+                return Draft[_func](_func, kwargs)
 
             _func.vd = vd
             if PYDANTIC_V1:

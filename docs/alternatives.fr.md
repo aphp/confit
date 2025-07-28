@@ -35,6 +35,7 @@ Cependant, si votre objectif principal est de construire une interface en ligne 
 | Évaluation d'expressions arbitraires      | :white_check_mark: | :no_entry_sign:    | :no_entry_sign:    | NA              | NA              |
 | Interpolation post-résolution             | :white_check_mark: | :no_entry_sign:    | :no_entry_sign:    | NA              | NA              |
 | Instanciation de classe personnalisée     | :white_check_mark: | :white_check_mark: | :white_check_mark: | NA              | NA              |
+| Instantiation reportée                    | :white_check_mark: | :no_entry_sign:    | :white_check_mark: | NA              | NA              |
 
 ### Export
 | Fonctionnalité                           | Confit             | Confection         | Gin             | Typer           | Pydantic-cli    |

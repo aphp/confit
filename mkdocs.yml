@@ -50,10 +50,10 @@ watch:
 extra:
   alternate:
     - name: English
-      link: ./en/
+      link: /
       lang: en
     - name: Français
-      link: ./fr/
+      link: /fr/
       lang: fr
   version:
     provider: mike
@@ -75,29 +75,21 @@ plugins:
             heading_level: 2
             members_order: source
             show_root_toc_entry: false
-  - glightbox:
-      touchNavigation: true
-      loop: false
-      effect: none
-      width: 100%
-      height: auto
-      zoomable: true
-      draggable: true
   - i18n:
       default_language: en
       docs_structure: suffix
       languages:
-        en:
+        - locale: en
           name: English
           build: true
-        fr:
+          default: true
+        - locale: fr
           name: Français
           build: true
-      nav_translations:
-        fr:
-          Alternatives & Comparison: Alternatives & Comparaisons
-          Configuration system: Système de configuration
-          Getting started: Mise en route
+          nav_translations:
+            Alternatives & Comparison: Alternatives & Comparaisons
+            Configuration system: Système de configuration
+            Getting started: Mise en route
   - mike
 
 markdown_extensions:

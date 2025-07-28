@@ -2,12 +2,10 @@
 
 Confit is a complete and easy-to-use configuration framework aimed at improving the reproducibility of experiments by relying on the Python typing system, minimal configuration files and command line interfaces.
 
-## Architecture
-
 The three pillars of this configuration system are the [catalogue](https://github.com/explosion/catalogue) registry,
 the [Pydantic](https://github.com/pydantic/pydantic) validation system and the [typer](https://github.com/tiangolo/typer) CLI library.
 
-### Registry
+## Registry
 
 The catalogue registry records the various objects (classes or functions) that can be composed
 together to run your program. Once registered, with the `registry.factory.register`
@@ -43,16 +41,75 @@ class registry(RegistryCollection):
     # Out: "The value is 42!"
     ```
 
-### Typing system
+## Typing system
 
 The Pydantic `validate_arguments` decorator enhances a function to automatically parse and validate its arguments every time it is called, using the Pydantic typing-based validation system.
 For instance, strings can be automatically cast as Path objects, or datetime or numbers depending on the type annotation of the argument.
 
 Combined with our configuration system, dictionaries passed as arguments to a decorated function can be "cast" as instantiated classes if these classes were them-selves decorated.
 
-### CLI
+## CLI
 
-TBD
+We provide the `confit.Cli` object, a Typer-based wrapper that turns a regular function into a command line interface. Once decorated with `@app.command`, the function can be executed from the terminal and automatically accepts one or several `--config` files containing its parameters, as well as parameter-wise overrides.
+
+For instance, we'll decorate the `cool_function` function to make it available as a command line interface, and put some of its parameters in a configuration file `config.yml`:
+
+```python
+from confit import Cli, Registry, RegistryCollection
+
+
+class registry(RegistryCollection):
+    factory = Registry(("myapp", "factory"), entry_points=True)
+
+
+@registry.factory.register("my-class")
+class MyClass:
+    def __init__(self, value1: int, value2: float):
+        self.value1 = value1
+        self.value2 = value2
+
+
+app = Cli()
+
+
+@app.command(name="cool_function", registry=registry)
+def cool_function(
+    modelA: MyClass,
+    modelB,
+    seed: int = 0,
+):
+    ...
+
+
+if __name__ == "__main__":
+    app()
+```
+
+```yaml { title="config.yml" }
+# No need for @factory here, as the type hint is enough
+modelA:
+  value1: 0
+  value2: 1.5
+
+# ModelB is not type hinted, so we need to tell how to instantiate it
+modelB:
+  "@factory": "my-class"
+  value1: 2
+  value2: 3.5
+
+cool_function:
+  modelA: ${modelA}
+  modelB: ${modelB}
+```
+
+All left to do is to run the script with the `--config` option, which will read the configuration file and instantiate the objects accordingly:
+
+```bash
+python script.py --config config.yml --seed 42
+```
+
+Command line arguments override values from the configuration. If multiple
+configuration files are provided, they are merged in order.
 
 ## The Config object
 
@@ -196,3 +253,40 @@ To access those values directly in the configuration file, use the `${<obj:attri
     other_values:
         value3: ${myclass:hidden_value}
     ```
+
+## Drafts
+
+When a component is instantiated with `MyClass.draft(...)` instead of `MyClass(...)`, the call returns a `Draft` object rather than instantiating the object immediately.
+
+This "draft" retains the provided parameters and can be instantiated later via `Draft.instantiate()`. This is particularly useful when certain parameters not available at the same time, and the object's instantiation can be delegated to another component.
+
+This can be seen as a simplified version of the [builder design pattern](https://en.wikipedia.org/wiki/Builder_pattern).
+
+```python
+from confit import validate_arguments
+
+
+@validate_arguments
+class MyClass:
+    def __init__(self, value1: int, value2: float):
+        self.value1 = value1
+        self.value2 = value2
+
+    def __repr__(self):
+        return f"MyClass(value1={self.value1}, value2={self.value2})"
+
+
+draft = MyClass.draft(value1=1)
+type(draft)
+# Out: Draft[MyClass]
+
+draft.instantiate(value2=2.5)
+# Out: MyClass(value1=1, value2=2.5)
+```
+
+In a config file, a draft can be instantiated by using the following syntax:
+```yaml
+modelA:
+    "@draft": my-class !draft
+    value1: 0
+```

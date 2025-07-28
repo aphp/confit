@@ -36,6 +36,7 @@ However, if your primary focus is on building a robust CLI, Typer is a strong al
 | Arbitrary expression eval     | :white_check_mark: | :no_entry_sign:    | :no_entry_sign:    | NA              | NA              |
 | Post-resolution interpolation | :white_check_mark: | :no_entry_sign:    | :no_entry_sign:    | NA              | NA              |
 | Custom class instantiation    | :white_check_mark: | :white_check_mark: | :white_check_mark: | NA              | NA              |
+| Deferred instantiation        | :white_check_mark: | :no_entry_sign:    | :white_check_mark: | NA              | NA              |
 
 ### Exporting
 | Feature                         | Confit             | Confection         | Gin             | Typer           | Pydantic-cli    |

@@ -126,6 +126,11 @@ class MetaDraft(type):
     def __repr__(self):
         return f"Draft[{self.type_.__qualname__}]"
 
+    def __instancecheck__(cls, obj):
+        if isinstance(type(obj), MetaDraft):
+            return obj.type_ == cls.type_ or cls.type_ is Any
+        return False
+
 
 T = TypeVar("T")
 
@@ -166,7 +171,8 @@ class Draft(Generic[T], metaclass=MetaDraft):
 
         # Order matters: priority is given to the kwargs provided
         # by the user, so most likely when the Partial is instantiated
-        return self._func(**{**kwargs, **self._kwargs})
+        res = self._func(**{**kwargs, **self._kwargs})
+        return res
 
     def _raise_draft_error(self):
         raise TypeError(

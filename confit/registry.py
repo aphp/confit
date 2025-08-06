@@ -331,17 +331,6 @@ def validate_arguments(
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
-            required_kw_params = inspect.signature(vd.raw_function).parameters
-            required_kw_params = {
-                k
-                for k, v in required_kw_params.items()
-                if v.default is v.empty
-                if v.kind != v.VAR_KEYWORD
-                and v.kind != v.POSITIONAL_ONLY
-                and v != v.VAR_POSITIONAL
-                and k != "self"
-            }
-
             @wraps(
                 vd.raw_function,
                 assigned=(
@@ -403,16 +392,6 @@ def validate_arguments(
                         e.__suppress_context__ = True
                     raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
 
-            required_kw_params = inspect.signature(vd.raw_function).parameters
-            required_kw_params = {
-                k
-                for k, v in required_kw_params.items()
-                if v.default is v.empty
-                if v.kind != v.VAR_KEYWORD
-                and v.kind != v.POSITIONAL_ONLY
-                and v != v.VAR_POSITIONAL
-            }
-
             @wraps(
                 vd.raw_function,
                 assigned=(
@@ -426,8 +405,6 @@ def validate_arguments(
                 ),
             )
             def draft(**kwargs):
-                if all(k in kwargs for k in required_kw_params):
-                    return _func(**kwargs)
                 return Draft(_func, kwargs)
 
             wrapper_function.vd = vd  # type: ignore
@@ -487,7 +464,6 @@ class Registry(catalogue.Registry):
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-        auto_draft_in_config: bool = False,
     ) -> Draftable[P, R]: ...
 
     @overload
@@ -500,7 +476,6 @@ class Registry(catalogue.Registry):
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-        auto_draft_in_config: bool = False,
     ) -> Union[Type[R], Draftable[Any, R]]: ...
 
     @overload
@@ -512,7 +487,6 @@ class Registry(catalogue.Registry):
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-        auto_draft_in_config: bool = False,
     ) -> Callable[[Callable[P, R]], Draftable[P, R]]: ...
 
     @overload
@@ -524,7 +498,6 @@ class Registry(catalogue.Registry):
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-        auto_draft_in_config: bool = False,
     ) -> Callable[[Type[R]], Union[Type[R], Draftable[Any, R]]]: ...
 
     def register(
@@ -536,7 +509,6 @@ class Registry(catalogue.Registry):
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-        auto_draft_in_config: bool = False,
     ) -> Callable[[Callable[P, R]], Draftable[P, R]]:
         """
         This is a convenience wrapper around `catalogue.Registry.register`, that
@@ -561,25 +533,12 @@ class Registry(catalogue.Registry):
             validating its parameters.
         deprecated: Sequence[str]
             The deprecated registry names for the function
-        auto_draft_in_config: bool
-            Allow to call the function with some mandatory parameters missing. This is
-            useful when a given parameter is not known by the user but computed later,
-            right before the factory is called.
-
-            If true and some mandatory parameters are missing, a Partial object is
-            returned.
 
         Returns
         -------
         Callable[[Func], Func]
         """
         registerer = super().register
-
-        if auto_draft_in_config:
-            warnings.warn(
-                "`auto_draft_in_config` is deprecated, prefer explicitly "
-                "creating drafts using '@registry = name !draft'"
-            )
 
         save_params = save_params or {f"@{self.namespace[-1]}": name}
 
@@ -605,10 +564,7 @@ class Registry(catalogue.Registry):
                 invoker=invoke,
             )
 
-            if auto_draft_in_config:
-                registerer(name)(validated_fn.draft)
-            else:
-                registerer(name)(validated_fn)
+            registerer(name)(validated_fn)
 
             for deprecated_name in deprecated:
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.10.0
 
 - Deprecate `auto_draft_in_config`, in favor of explicitly using
   ```

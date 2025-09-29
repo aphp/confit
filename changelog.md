@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.10.1 (2025-09-29)
 
 - Simplify typing of `Registry.register(...)` to help jedi infer the type of the registered callable
 

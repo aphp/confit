@@ -168,15 +168,22 @@ class Cli(Typer):
                     )
                     if is_debug() or e.__cause__ is not None:
                         raise e
-                    try:
-                        import rich
 
-                        console = rich.console.Console(stderr=True)
-                        console.print("Validation error:", style="red", end=" ")
-                        console.print(str(e))
-                    except ImportError:  # pragma: no cover
-                        print("Validation error:", file=sys.stderr, end=" ")
-                        print(str(e), file=sys.stderr)
+                    def cprint(*args, style=None, **kw):  # pragma: no cover
+                        return print(*args, **kw)
+
+                    try:  # pragma: no cover
+                        try:
+                            from typer.main import console_stderr
+                        except ImportError:
+                            import rich
+
+                            console_stderr = rich.console.Console(stderr=True)
+                        cprint = console_stderr.print
+                    except Exception:  # pragma: no cover
+                        pass
+                    cprint("Validation error:", style="red", end=" ")
+                    cprint(str(e))
                     sys.exit(1)
                 except KeyboardInterrupt as e:  # pragma: no cover
                     raise Exception("Interrupted by user") from e

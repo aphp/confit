@@ -30,7 +30,9 @@ P = ParamSpec("P")
 R = TypeVar("R", covariant=True)
 
 
-class Draftable(Protocol[P, R]):
+# Note ! R (Return) and P (Parameters) are reversed compared to
+# the usual convention of Protocols, because Jedi can't handle it otherwise
+class Draftable(Protocol[R, P]):
     draft: Callable[P, "Draft[R]"]
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R: ...
@@ -132,10 +134,7 @@ class MetaDraft(type):
         return False
 
 
-T = TypeVar("T")
-
-
-class Draft(Generic[T], metaclass=MetaDraft):
+class Draft(Generic[R], metaclass=MetaDraft):
     """
     A Draft is a placeholder for a value that has not been instantiated yet, likely
     because it is missing an argument that will be provided later by the library.
@@ -143,28 +142,19 @@ class Draft(Generic[T], metaclass=MetaDraft):
 
     def __init__(
         self,
-        func: Callable[..., T],
+        func: Callable[P, R],
         kwargs: Dict[str, Any],
     ):
         self._func = func
         self._kwargs = kwargs
 
-    def instantiate(self: "Union[T, Draft[T]]", **kwargs) -> T:
+    def instantiate(self, **kwargs) -> R:
         """
         Finalize the Draft object into an instance of the expected type
         using the provided arguments. The new arguments are merged with the
         existing ones, with the old ones taking precedence. The rationale
         for this is that the user makes the Draft, and the library
         completes any missing arguments.
-
-        Parameters
-        ----------
-        kwargs:
-            The arguments to complete the Draft
-
-        Returns
-        -------
-        T
         """
         if not isinstance(self, Draft):
             return self

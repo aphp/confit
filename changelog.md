@@ -1,6 +1,10 @@
 # Changelog
 
-## v0.10.0
+## Unreleased
+
+- Simplify typing of `Registry.register(...)` to help jedi infer the type of the registered callable
+
+## v0.10.0 (2025-08-26)
 
 - Drop `auto_draft_in_config`, in favor of explicitly using
   ```

@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>Nonealternatives/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonealternatives/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/alternatives/"/>
+    </url>
+    <url>
+        <loc>Nonechangelog/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonechangelog/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/changelog/"/>
+    </url>
+    <url>
+        <loc>Nonecontributing/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonecontributing/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/contributing/"/>
+    </url>
+    <url>
+        <loc>Nonegetting-started/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonegetting-started/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/getting-started/"/>
+    </url>
+    <url>
+        <loc>None./</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/"/>
+    </url>
+    <url>
+        <loc>Noneroadmap/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneroadmap/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/roadmap/"/>
+    </url>
+    <url>
+        <loc>Nonereference/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/"/>
+    </url>
+    <url>
+        <loc>Nonereference/cli/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/cli/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/cli/"/>
+    </url>
+    <url>
+        <loc>Nonereference/config/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/config/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/config/"/>
+    </url>
+    <url>
+        <loc>Nonereference/draft/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/draft/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/draft/"/>
+    </url>
+    <url>
+        <loc>Nonereference/errors/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/errors/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/errors/"/>
+    </url>
+    <url>
+        <loc>Nonereference/registry/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/registry/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/registry/"/>
+    </url>
+    <url>
+        <loc>Nonereference/typing/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/typing/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/typing/"/>
+    </url>
+    <url>
+        <loc>Nonereference/utils/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/"/>
+    </url>
+    <url>
+        <loc>Nonereference/utils/collections/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/collections/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/collections/"/>
+    </url>
+    <url>
+        <loc>Nonereference/utils/eval/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/eval/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/eval/"/>
+    </url>
+    <url>
+        <loc>Nonereference/utils/random/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/random/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/random/"/>
+    </url>
+    <url>
+        <loc>Nonereference/utils/settings/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/settings/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/settings/"/>
+    </url>
+    <url>
+        <loc>Nonereference/utils/xjson/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/xjson/"/>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/xjson/"/>
+    </url>
+    <url>
+        <loc>Nonefr/alternatives/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/alternatives/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonealternatives/"/>
+    </url>
+    <url>
+        <loc>Nonefr/changelog/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/changelog/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonechangelog/"/>
+    </url>
+    <url>
+        <loc>Nonefr/contributing/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/contributing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonecontributing/"/>
+    </url>
+    <url>
+        <loc>Nonefr/getting-started/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/getting-started/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonegetting-started/"/>
+    </url>
+    <url>
+        <loc>Nonefr/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+    </url>
+    <url>
+        <loc>Nonefr/roadmap/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/roadmap/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneroadmap/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/cli/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/cli/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/cli/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/config/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/config/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/config/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/draft/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/draft/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/draft/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/errors/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/errors/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/errors/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/registry/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/registry/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/registry/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/typing/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/typing/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/typing/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/utils/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/utils/collections/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/collections/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/collections/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/utils/eval/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/eval/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/eval/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/utils/random/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/random/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/random/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/utils/settings/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/settings/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/settings/"/>
+    </url>
+    <url>
+        <loc>Nonefr/reference/utils/xjson/</loc>
+        <lastmod>2025-09-29</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="fr" href="Nonefr/reference/utils/xjson/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonereference/utils/xjson/"/>
+    </url>
+</urlset>

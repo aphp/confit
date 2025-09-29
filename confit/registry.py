@@ -454,52 +454,6 @@ class Registry(catalogue.Registry):
         super().__init__(namespace, entry_points=entry_points)
         self.registry = None
 
-    @overload
-    def register(
-        self,
-        name: str,
-        *,
-        func: Callable[P, R],
-        save_params: Optional[Dict[str, Any]] = None,
-        skip_save_params: Sequence[str] = (),
-        invoker: Optional[Callable] = None,
-        deprecated: Sequence[str] = (),
-    ) -> Draftable[P, R]: ...
-
-    @overload
-    def register(
-        self,
-        name: str,
-        *,
-        func: Type[R],
-        save_params: Optional[Dict[str, Any]] = None,
-        skip_save_params: Sequence[str] = (),
-        invoker: Optional[Callable] = None,
-        deprecated: Sequence[str] = (),
-    ) -> Union[Type[R], Draftable[Any, R]]: ...
-
-    @overload
-    def register(
-        self,
-        name: str,
-        *,
-        save_params: Optional[Dict[str, Any]] = None,
-        skip_save_params: Sequence[str] = (),
-        invoker: Optional[Callable] = None,
-        deprecated: Sequence[str] = (),
-    ) -> Callable[[Callable[P, R]], Draftable[P, R]]: ...
-
-    @overload
-    def register(
-        self,
-        name: str,
-        *,
-        save_params: Optional[Dict[str, Any]] = None,
-        skip_save_params: Sequence[str] = (),
-        invoker: Optional[Callable] = None,
-        deprecated: Sequence[str] = (),
-    ) -> Callable[[Type[R]], Union[Type[R], Draftable[Any, R]]]: ...
-
     def register(
         self,
         name: str,
@@ -509,7 +463,7 @@ class Registry(catalogue.Registry):
         skip_save_params: Sequence[str] = (),
         invoker: Optional[Callable] = None,
         deprecated: Sequence[str] = (),
-    ) -> Callable[[Callable[P, R]], Draftable[P, R]]:
+    ) -> Callable[[Callable[P, R]], Union[Callable[P, R], Draftable[R, P]]]:
         """
         This is a convenience wrapper around `catalogue.Registry.register`, that
         additionally validates the input arguments of the registered function and
@@ -517,26 +471,22 @@ class Registry(catalogue.Registry):
 
         Parameters
         ----------
-        name: str
+        name:
             The name of the function
-        func: Optional[Func]
+        func:
             The function to register
-        save_params: Optional[Dict[str, Any]]
+        save_params:
             Additional parameters to save when the function is called. If falsy,
             the function parameters are not saved
-        skip_save_params: Sequence[str]
+        skip_save_params:
             List of parameters to skip when saving the function parameters
-        invoker: Optional[Callable] = None,
+        invoker:
             An optional invoker to apply to the function before registering it.
             It is better to use this than to apply the invoker to the function
             to preserve the signature of the function or the class and enable
             validating its parameters.
-        deprecated: Sequence[str]
+        deprecated:
             The deprecated registry names for the function
-
-        Returns
-        -------
-        Callable[[Func], Func]
         """
         registerer = super().register
 

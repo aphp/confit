@@ -24,5 +24,5 @@ jobs:
     - name: Build documentation
       run: |
         git fetch origin gh-pages
-        mike delete main
-        mike deploy --push main
+        uv run mike delete main
+        uv run mike deploy --push main

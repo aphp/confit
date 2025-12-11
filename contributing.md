@@ -17,7 +17,7 @@ git clone ssh://git@github.com/aphp/confit.git
 cd confit
 
 # Install the library with its dev dependencies
-uv sync --group dev --group docs
+uv pip install -e . --group dev --group docs
 
 # Activate the virtual environment
 source .venv/bin/activate

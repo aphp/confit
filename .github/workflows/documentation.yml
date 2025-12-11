@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+env:
+  UV_TORCH_BACKEND: "auto"  # only used with uv pip install
+
 jobs:
   Documentation:
     runs-on: ubuntu-latest
@@ -16,7 +19,10 @@ jobs:
       with:
         cache-suffix: -docs-${{ matrix.python-version }}-${{ env.WEEK }}
     - name: Install dependencies
-      run: uv sync --group docs --group dev
+      run: |
+        uv venv
+        source .venv/bin/activate
+        uv pip install -e . --group docs --group dev
     - name: Set up Git
       run: |
         git config user.name ${{ github.actor }}

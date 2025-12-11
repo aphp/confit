@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 env:
-  UV_TORCH_BACKEND: "auto"
+  UV_TORCH_BACKEND: "auto"  # only used with uv pip install
 
 jobs:
   Linting:
@@ -43,7 +43,10 @@ jobs:
         with:
           cache-suffix: -tests-${{ matrix.python-version }}-${{ env.WEEK }}
       - name: Install dependencies
-        run: uv sync --group dev
+        run: |
+          uv venv
+          source .venv/bin/activate 
+          uv pip install -e . --group dev
 
       - name: Test with Pytest on Python ${{ matrix.python-version }}
         run: |
@@ -88,7 +91,10 @@ jobs:
       with:
         cache-suffix: -docs-${{ matrix.python-version }}-${{ env.WEEK }}
     - name: Install dependencies
-      run: uv sync --group docs --group dev
+      run: |
+        uv venv
+        source .venv/bin/activate 
+        uv pip install -e . --group docs --group dev
     - name: Build documentation
       run: |
         source .venv/bin/activate

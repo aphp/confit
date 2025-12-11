@@ -1,10 +1,8 @@
 site_name: Confit
 
 repo_url: https://github.com/aphp/confit
-# repo_name: algorithms/pseudonymisation
 
 theme:
-  language: en
   name: material
   palette:
     - scheme: default
@@ -23,8 +21,8 @@ theme:
     - content.code.annotate
 
 nav:
-  - getting-started.en.md
-  - index.en.md
+  - getting-started.md
+  - index.md
   - alternatives.md
   - Code Reference: reference/
   - contributing.md
@@ -33,13 +31,6 @@ nav:
 
 extra_css:
   - assets/stylesheets/extra.css
-  - assets/termynal/termynal.css
-
-extra_javascript:
-  - https://cdn.jsdelivr.net/npm/vega@5
-  - https://cdn.jsdelivr.net/npm/vega-lite@5
-  - https://cdn.jsdelivr.net/npm/vega-embed@6
-  - assets/termynal/termynal.js
 
 watch:
   - contributing.md
@@ -48,13 +39,6 @@ watch:
   - confit
 
 extra:
-  alternate:
-    - name: English
-      link: /
-      lang: en
-    - name: Français
-      link: /fr/
-      lang: fr
   version:
     provider: mike
 
@@ -62,11 +46,30 @@ hooks:
     - docs/scripts/plugin.py
 
 plugins:
-  - search
-  - bibtex:
-      bib_file: "docs/references.bib"
-  - autorefs
+  - auto_gen_pages:
+      package_dirs: ["confit"]
+      reference_section: Reference
+      copy_files:
+        changelog.md: changelog.md
+        contributing.md: contributing.md
+  - fix_fonts:
+  - cards:
+  - search:
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+          remove_comments: true
+      cache_safe: true
+  - autorefs:
+      priority:
+        - '*'
+        - reference
+  - pret_snippet_renderer:
+  - mkdocstrings_options_templates:
   - mkdocstrings:
+      enable_inventory: true
       handlers:
         python:
           options:
@@ -75,21 +78,15 @@ plugins:
             heading_level: 2
             members_order: source
             show_root_toc_entry: false
-  - i18n:
-      default_language: en
-      docs_structure: suffix
-      languages:
-        - locale: en
-          name: English
-          build: true
-          default: true
-        - locale: fr
-          name: Français
-          build: true
-          nav_translations:
-            Alternatives & Comparison: Alternatives & Comparaisons
-            Configuration system: Système de configuration
-            Getting started: Mise en route
+            show_signature: false
+            merge_init_into_class: true
+          inventories:
+            - https://aphp.github.io/confit/latest/objects.inv
+            - https://percevalw.github.io/metanno/latest/objects.inv
+            - https://percevalw.github.io/pret/latest/objects.inv
+  - bibtex:
+      bibtex_file: "docs/references.bib"
+  - clickable_code:
   - mike
 
 markdown_extensions:

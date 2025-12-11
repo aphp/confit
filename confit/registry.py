@@ -42,7 +42,7 @@ if pydantic.VERSION >= "2":
 
 try:
     import importlib.metadata as importlib_metadata
-except ImportError:
+except ImportError:  # pragma: no cover
     import importlib_metadata
 
 PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"

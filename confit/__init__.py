@@ -11,4 +11,4 @@ from .registry import (
 from .typing import Validatable, cast
 from .draft import Draft
 
-__version__ = "0.10.1"
+__version__ = "0.10.2"

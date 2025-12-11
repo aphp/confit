@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.10.2 (2025-12-11)
 
 - Confit should not complain anymore when given multiline strings
 

@@ -5,33 +5,32 @@ on:
   push:
     branches: [main]
 
+env:
+  UV_TORCH_BACKEND: "auto"
+
 jobs:
   Linting:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
-      - name: Set PY variable
-        run: echo "PY=$(python -VV | sha256sum | cut -d' ' -f1)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
+          # requites to grab the history of the PR
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
         with:
-          path: ~/.cache/pre-commit
-          key: pre-commit|${{ env.PY }}|${{ hashFiles('.pre-commit-config.yaml') }}
-      - name: Install pre-commit
-        run: |
-          pip install pre-commit
-          pre-commit install
-      - name: Run pre-commit
-        run: SKIP=no-commit-to-branch pre-commit run --all-files
+          cache: 'pip'
+
+      - uses: pre-commit/action@v3.0.0
+        with:
+          extra_args: --color=always --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.event.pull_request.head.sha }}
 
   Pytest:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -43,10 +42,7 @@ jobs:
         with:
           cache-suffix: -tests-${{ matrix.python-version }}-${{ env.WEEK }}
       - name: Install dependencies
-        run: |
-          uv venv
-          source .venv/bin/activate
-          uv pip install '.[dev]'
+        run: uv sync --group dev
 
       - name: Test with Pytest on Python ${{ matrix.python-version }}
         run: |
@@ -81,31 +77,28 @@ jobs:
       coverage-branch: coverage
 
   Documentation:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-python@v4
       with:
-        python-version: "3.9"
+        python-version: "3.12"
     - uses: hynek/setup-cached-uv@v2
       with:
         cache-suffix: -docs-${{ matrix.python-version }}-${{ env.WEEK }}
     - name: Install dependencies
-      run: |
-        uv venv
-        source .venv/bin/activate
-        uv pip install '.[dev]'
+      run: uv sync --group docs --group dev
     - name: Build documentation
       run: |
         source .venv/bin/activate
         mkdocs build --clean
 
   Installation:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -118,6 +111,4 @@ jobs:
           cache-suffix: -tests-${{ matrix.python-version }}-${{ env.WEEK }}
       - name: Install library
         run: |
-          uv venv
-          source .venv/bin/activate
-          uv pip install .
+          pip install .

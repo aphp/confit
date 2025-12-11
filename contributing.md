@@ -8,46 +8,34 @@ We welcome contributions ! There are many ways to help. For example, you can:
 
 ## Development installation
 
-To be able to run the test suite and develop your own pipeline, you should clone the repo and install it locally.
+To be able to run the test suite and develop your own pipeline, you should clone the repo and install it locally. You will need to have [uv](https://docs.astral.sh/uv/) installed.
 
-<div class="termy">
+```bash { data-md-color-scheme="slate" }
+# Clone the repository and change directory
+git clone ssh://git@github.com/aphp/confit.git
 
-```console
-color:gray # Clone the repository and change directory
-$ git clone ssh://git@github.com/aphp/confit.git
----> 100%
+cd confit
 
-$ cd confit
+# Install the library with its dev dependencies
+uv sync --group dev --group docs
 
-color:gray # Install the library with its dev dependencies
-$ pip install -e ".[dev]"
+# Activate the virtual environment
+source .venv/bin/activate
 ```
-
-</div>
 
 To make sure the pipeline will not fail because of formatting errors, we added pre-commit hooks using the `pre-commit` Python library. To use it, simply install it:
 
-<div class="termy">
-
-```console
-$ pre-commit install
+```bash { data-md-color-scheme="slate" }
+pre-commit install
 ```
-
-</div>
 
 The pre-commit hooks defined in the [configuration](https://github.com/aphp/confit/blob/master/.pre-commit-config.yaml) will automatically run when you commit your changes, letting you know if something went wrong.
 
 The hooks only run on staged changes. To force-run it on all files, run:
 
-<div class="termy">
-
-```console
-$ pre-commit run --all-files
----> 100%
-color:green All good !
+```bash { data-md-color-scheme="slate" }
+uv run pre-commit run --all-files
 ```
-
-</div>
 
 ## Proposing a merge request
 
@@ -63,19 +51,17 @@ We use the Pytest test suite.
 
 The following command will run the test suite. Writing your own tests is encouraged !
 
-```shell
-python -m pytest
+```bash { data-md-color-scheme="slate" }
+uv run pytest
 ```
 
 Should your contribution propose a bug fix, we require the bug be thoroughly tested.
 
 ### Style Guide
 
-We use [Black](https://github.com/psf/black) and [Ruff](https://github.com/charliermarsh/ruff) to reformat the code. While other formatter only enforce PEP8 compliance, Black also makes the code uniform. In short :
+We use [Ruff](https://github.com/charliermarsh/ruff) to reformat the code.
 
-> Black reformats entire files in place. It is not configurable.
-
-Moreover, the CI/CD pipeline enforces a number of checks on the "quality" of the code. To wit, non black-formatted code will make the test pipeline fail. We use `pre-commit` to keep our codebase clean.
+Moreover, the CI/CD pipeline enforces a number of checks on the "quality" of the code. To wit, non ruff-formatted code will make the test pipeline fail. We use `pre-commit` to keep our codebase clean.
 
 Refer to the [development install tutorial](#development-installation) for tips on how to format your files automatically.
 Most modern editors propose extensions that will format files on save.
@@ -87,14 +73,9 @@ as well as in the documentation itself if need be.
 
 We use `MkDocs` for Confit's documentation. You can checkout the changes you make with:
 
-<div class="termy">
-
-```console
-color:gray # Run the documentation
-$ mkdocs serve
+```bash { data-md-color-scheme="slate" }
+uv run mkdocs serve
 ```
-
-</div>
 
 Go to [`localhost:8000`](http://localhost:8000) to see your changes. MkDocs watches for changes in the documentation folder
 and automatically reloads the page.

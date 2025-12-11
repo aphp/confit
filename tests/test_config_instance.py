@@ -692,9 +692,7 @@ def test_very_long_yaml_config():
     config = Config.from_yaml_str(
         """\
         a: {}
-        """.format(
-            "x" * 4200
-        )
+        """.format("x" * 4200)
     ).resolve(registry=registry)
     assert config == {"a": "x" * 4200}
 

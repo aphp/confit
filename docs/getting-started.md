@@ -4,13 +4,9 @@
 
 Install the library with pip:
 
-<div class="termy">
-
-```console
-$ pip install confit
+```bash { data-md-color-scheme="slate" }
+pip install confit
 ```
-
-</div>
 
 ## A simple example
 
@@ -19,8 +15,7 @@ leaves the rest of your code unchanged.
 
 Here is an example:
 
-
-```diff title="script.py"
+```diff { title="script.py" .no-click }
 import datetime
 + from confit import Cli, Registry, RegistryCollection
 
@@ -81,13 +76,9 @@ Create a new config file
 
     and run the following command from the terminal
 
-    <div class="termy">
-
-    ```console
-    $ python script.py --config config.cfg --seed 42
+    ```bash { data-md-color-scheme="slate" }
+    python script.py --config config.cfg --seed 42
     ```
-
-    </div>
 
 === "YAML syntax"
 
@@ -111,13 +102,9 @@ Create a new config file
 
     and run the following command from the terminal
 
-    <div class="termy">
-
-    ```console
-    $ python script.py --config config.yaml --seed 42
+    ```bash { data-md-color-scheme="slate" }
+    python script.py --config config.yaml --seed 42
     ```
-
-    </div>
 
 !!! tip "Naming"
 

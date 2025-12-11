@@ -22,7 +22,7 @@ def get_len(*, string: str) -> torch.Tensor:
     torch.Tensor
         Length of the string.
     """
-    return len(string)
+    return torch.tensor([len(string)])
 
 
 draft_value = get_len.draft(string="ok")

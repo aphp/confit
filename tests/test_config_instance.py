@@ -719,6 +719,21 @@ section:
     assert config["section"]["escaped_ref"] == "${test.a}"
 
 
+def test_multiline_yaml_string():
+    config = Config.from_yaml_str(
+        """\
+obj: |-
+    Ceci est un test avec des parenthèses (comme ça)
+    et une "citation"
+other_key: "ok"
+"""
+    )
+    assert config == {
+        "obj": 'Ceci est un test avec des parenthèses (comme ça)\net une "citation"',
+        "other_key": "ok",
+    }
+
+
 def test_newline_serialization():
     config = Config(
         {

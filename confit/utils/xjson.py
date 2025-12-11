@@ -275,6 +275,8 @@ def loads(s: str):
     try:
         return XJsonTransformer(s).transform(_json_parser.parse(s))
     except Exception:
+        if "\n" in s or "\r" in s:
+            return s
         # Fail if we suspect that it is a malformed object
         # (e.g. has ', ", {, }, [, ] in it)
         if set(s) & set(",'\"{}[]$"):

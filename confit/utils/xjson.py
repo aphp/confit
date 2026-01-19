@@ -1,5 +1,6 @@
 import ast
 from typing import Any, Callable
+import warnings
 
 from lark import Lark, Transformer, Tree
 
@@ -280,7 +281,10 @@ def loads(s: str):
         # Fail if we suspect that it is a malformed object
         # (e.g. has ', ", {, }, [, ] in it)
         if set(s) & set(",'\"{}[]$"):
-            raise MalformedValueError(s)
+            warnings.warn(
+                f"Some values may be malformed JSON objects. Got: {s!r}",
+                UserWarning,
+            )
         return s
 
 

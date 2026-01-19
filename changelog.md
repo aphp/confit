@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.10.3 (2025-01-19)
+
+- Don't fail but warn, when we suspect that un unquoted string might actually be an object in config files.
+
 ## v0.10.2 (2025-12-11)
 
 - Confit should not complain anymore when given multiline strings

@@ -120,11 +120,7 @@ class Config(dict):
             current.clear()
             errors = []
             for k, v in parser.items(section):
-                parsed_k = loads(k)
-                try:
-                    current[parsed_k] = loads(v)
-                except ValueError as e:
-                    errors.append(ErrorWrapper(e, loc=parsed_k))
+                current[loads(k)] = loads(v)
 
             if errors:
                 raise ConfitValidationError(errors=errors)

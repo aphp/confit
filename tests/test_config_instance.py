@@ -568,8 +568,8 @@ def test_warn_if_suspected_json_malformation():
 
     assert len(record) == 2
     assert [str(w.message) for w in record] == [
-        f"Some values may be malformed JSON objects. Got: {\"'ok\"!r}",
-        f"Some values may be malformed JSON objects. Got: {\"'ok']\"!r}",
+        f"Some values may be malformed JSON objects. Got: \"'ok\"",
+        f"Some values may be malformed JSON objects. Got: \"'ok']\"",
     ]
 
     assert config == {"section": {"string": "'ok", "list": "'ok']"}}

@@ -1,6 +1,6 @@
 import ast
-from typing import Any, Callable
 import warnings
+from typing import Any, Callable
 
 from lark import Lark, Transformer, Tree
 

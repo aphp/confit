@@ -14,7 +14,6 @@ from confit.draft import Draft
 from confit.errors import (
     ConfitValidationError,
     CyclicReferenceError,
-    ErrorWrapper,
     MissingReference,
     patch_errors,
     remove_lib_from_traceback,
@@ -120,11 +119,7 @@ class Config(dict):
             current.clear()
             errors = []
             for k, v in parser.items(section):
-                parsed_k = loads(k)
-                try:
-                    current[parsed_k] = loads(v)
-                except ValueError as e:
-                    errors.append(ErrorWrapper(e, loc=parsed_k))
+                current[loads(k)] = loads(v)
 
             if errors:
                 raise ConfitValidationError(errors=errors)
@@ -425,9 +420,9 @@ class Config(dict):
                     for key, value in resolved.items()
                     if isinstance(key, str) and key.startswith("@")
                 ]
-                assert (
-                    len(registries) <= 1
-                ), f"Cannot resolve using multiple registries at {'.'.join(loc)}"
+                assert len(registries) <= 1, (
+                    f"Cannot resolve using multiple registries at {'.'.join(loc)}"
+                )
 
                 if len(registries) == 1:
                     raw_key, value, registry_value = registries[0]
@@ -437,7 +432,7 @@ class Config(dict):
                     value = value.strip()
                     is_draft = value.endswith("!draft")
                     if is_draft:
-                        value = value[:-len("!draft")].strip()
+                        value = value[: -len("!draft")].strip()
                     fn = registry_value.get(value)
                     try:
                         if is_draft:

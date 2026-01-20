@@ -556,22 +556,23 @@ def test_list_interpolation():
     assert config["section"]["b"] == ["foo", "bar", "baz"]
 
 
-def test_fail_if_suspected_json_malformation():
-    with pytest.raises(ConfitValidationError) as exc_info:
-        Config.from_str(
+def test_warn_if_suspected_json_malformation():
+    with pytest.warns(UserWarning) as record:
+        config = Config.from_str(
             """
         [section]
         string = 'ok
         list = 'ok']
         """
         )
-    assert str(exc_info.value) == (
-        "2 validation errors\n"
-        "-> string\n"
-        '   Malformed value: "\'ok"\n'
-        "-> list\n"
-        "   Malformed value: \"'ok']\""
-    )
+
+    assert len(record) == 2
+    assert [str(w.message) for w in record] == [
+        'Some values may be malformed JSON objects. Got: "\'ok"',
+        "Some values may be malformed JSON objects. Got: \"'ok']\"",
+    ]
+
+    assert config == {"section": {"string": "'ok", "list": "'ok']"}}
 
 
 def test_string():

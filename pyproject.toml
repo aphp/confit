@@ -42,6 +42,9 @@ docs = {requires-python = ">=3.9"}
 [tool.setuptools.dynamic]
 version = { attr = "confit.__version__" }
 
+[tool.setuptools.packages]
+find = {where = ["."], include = ["confit"]}
+
 [tool.interrogate]
 ignore-init-method = false
 ignore-init-module = false

@@ -30,6 +30,15 @@ P = ParamSpec("P")
 R = TypeVar("R", covariant=True)
 
 
+def _display_type_name(obj: Any) -> str:
+    return (
+        getattr(obj, "__qualname__", None)
+        or getattr(obj, "__name__", None)
+        or getattr(obj, "_name", None)
+        or str(obj)
+    )
+
+
 # Note ! R (Return) and P (Parameters) are reversed compared to
 # the usual convention of Protocols, because Jedi can't handle it otherwise
 class Draftable(Protocol[R, P]):
@@ -126,11 +135,11 @@ class MetaDraft(type):
         return core_schema.no_info_plain_validator_function(cls.validate)
 
     def __repr__(self):
-        return f"Draft[{self.type_.__qualname__}]"
+        return f"Draft[{_display_type_name(self.type_)}]"
 
     def __instancecheck__(cls, obj):
         if isinstance(type(obj), MetaDraft):
-            return obj.type_ == cls.type_ or cls.type_ is Any
+            return cls.type_ is Any or issubclass(obj.type_, cls.type_)
         return False
 
 
@@ -147,6 +156,13 @@ class Draft(Generic[R], metaclass=MetaDraft):
     ):
         self._func = func
         self._kwargs = kwargs
+        return_type = inspect.signature(func).return_annotation
+        if isinstance(return_type, str):
+            raise RuntimeError(
+                f"{func} has been annotated as a string return type, "
+                f"and therefore cannot be used to validate the output : please "
+                "type hint it using non string type hints."
+            )
 
     def instantiate(self, **kwargs) -> R:
         """
@@ -179,4 +195,4 @@ class Draft(Generic[R], metaclass=MetaDraft):
         self._raise_draft_error()
 
     def __repr__(self):
-        return f"Draft[{self._func.__qualname__}]"
+        return f"Draft[{_display_type_name(self._func)}]"

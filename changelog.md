@@ -3,6 +3,7 @@
 ## v0.10.3 (2025-01-19)
 
 - Don't fail but warn, when we suspect that un unquoted string might actually be an object in config files.
+- Improved typing checks for drafts: we forbid string type hints, as we cannot validate against them
 
 ## v0.10.2 (2025-12-11)
 

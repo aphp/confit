@@ -272,7 +272,7 @@ def loads(s: str):
     except Exception:
         if "\n" in s or "\r" in s:
             return s
-        # Fail if we suspect that it is a malformed object
+        # Warn if we suspect that it is a malformed object
         # (e.g. has ', ", {, }, [, ] in it)
         if set(s) & set(",'\"{}[]$"):
             warnings.warn(

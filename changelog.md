@@ -5,9 +5,6 @@
 - Fix indexing: `Config.from_yaml_str(...)[key]` is now a Config object if it's a mapping
 - Drop typer and click, and handle the CLI ourselves, with better rendering for complex functions
 - Fix, correctly locate param error in error log when using Draft objects
-
-## v0.10.3 (2025-01-19)
-
 - Don't fail but warn, when we suspect that un unquoted string might actually be an object in config files.
 - Improved typing checks for drafts: we forbid string type hints, as we cannot validate against them
 

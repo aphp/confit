@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-__version__ = "0.10.2"
+__version__ = "0.11.0"
 
 
 def get_version(base_version: str = __version__) -> str:

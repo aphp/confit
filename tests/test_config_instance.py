@@ -673,6 +673,33 @@ params:
     assert config["params"]["c"] == 1
 
 
+def test_yaml_string_operation_inside_interpolation():
+    config = Config.from_yaml_str(
+        """\
+params:
+    field: ${section.string + "_suffix"}
+
+section:
+    string: value
+"""
+    ).resolve()
+    assert config["params"]["field"] == "value_suffix"
+
+
+def test_yaml_subconfig_resolve_with_root():
+    config = Config.from_yaml_str(
+        """\
+params:
+    field: ${section.string + "_suffix"}
+
+section:
+    string: value
+"""
+    )
+    assert isinstance(config["params"], Config)
+    assert config["params"].resolve(root=config)["field"] == "value_suffix"
+
+
 def test_if_else_complex():
     config = Config.from_yaml_str(
         """\

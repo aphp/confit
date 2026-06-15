@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix package source discovery
+
 ## v0.11.0 (2026-06-15)
 
 - Fix indexing: `Config.from_yaml_str(...)[key]` is now a Config object if it's a mapping

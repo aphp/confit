@@ -43,7 +43,7 @@ docs = {requires-python = ">=3.10"}
 version = { attr = "confit._version.__version__" }
 
 [tool.setuptools.packages]
-find = {where = ["."], include = ["confit"]}
+find = {where = ["."], include = ["confit", "confit.*"]}
 
 [tool.interrogate]
 ignore-init-method = false

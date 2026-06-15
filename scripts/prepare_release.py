@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = ROOT / "confit" / "_version.py"
 RELEASE_MESSAGE_START = "<!-- release-message:start -->"
 RELEASE_MESSAGE_END = "<!-- release-message:end -->"
-VERSION_RE = re.compile(r'^__version__\s*=\s*"([^"]+)"\s*$', re.MULTILINE)
+VERSION_RE = re.compile(r'^_BASE_VERSION\s*=\s*"([^"]+)"\s*$', re.MULTILINE)
 CHANGELOG_VERSION_RE = re.compile(
     r"^## v(\d+\.\d+\.\d+) \(\d{4}-\d{2}-\d{2}\)$", re.MULTILINE
 )
@@ -93,7 +93,7 @@ def tracked_changelog_path() -> Path:
 def read_current_version() -> str:
     match = VERSION_RE.search(VERSION_FILE.read_text())
     if match is None:
-        raise ReleaseError(f"Could not find __version__ in {VERSION_FILE}.")
+        raise ReleaseError(f"Could not find _BASE_VERSION in {VERSION_FILE}.")
     return match.group(1)
 
 

@@ -47,6 +47,10 @@ class CliRunner:
 
 
 runner = CliRunner()
+requires_pydantic_v2_for_edsnlp = pytest.mark.skipif(
+    PYDANTIC_V1,
+    reason="EDS-NLP tests require pydantic>=2",
+)
 
 
 def result_text(result):
@@ -289,6 +293,7 @@ def test_cli_help_shows_config_overrides():
     assert "v__duplicate_kwargs" not in help_text
 
 
+@requires_pydantic_v2_for_edsnlp
 def test_edsnlp_train_help_shows_config_overrides():
     try:
         edsnlp_train = pytest.importorskip("edsnlp.train")
@@ -335,6 +340,7 @@ def test_edsnlp_train_help_shows_config_overrides():
     assert "v__duplicate_kwargs" not in help_text
 
 
+@requires_pydantic_v2_for_edsnlp
 def test_edsnlp_train_missing_pipe_parameter_error(tmp_path):
     try:
         edsnlp_train = pytest.importorskip("edsnlp.train")
@@ -376,6 +382,7 @@ train:
     assert "field required" in text
 
 
+@requires_pydantic_v2_for_edsnlp
 def test_edsnlp_train_optimizer_parameter_error(tmp_path):
     try:
         edsnlp_train = pytest.importorskip("edsnlp.train")

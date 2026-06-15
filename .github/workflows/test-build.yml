@@ -1,0 +1,24 @@
+# This tries to build packages, and tests the packages.
+# It runs for release PRs whose source branch follows release/v*.*.* or build-*.
+# It makes sure that everything will run when the version is released.
+
+name: Test Build
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release/v') || startsWith(github.head_ref, 'build-')
+    name: Build source and wheel distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build distributions
+        run: pipx run build --sdist --wheel

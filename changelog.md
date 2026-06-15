@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.11.1 (2026-06-15)
 
 - Fix package source discovery
 

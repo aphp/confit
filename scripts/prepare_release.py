@@ -66,7 +66,7 @@ def run(
 def normalize_version(version: str) -> str:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ReleaseError(
-            f"Invalid version '{version}'. Expected a semantic version like 0.11.0."
+            f"Invalid version '{version}'. Expected a semantic version like 0.11.1."
         )
     return version
 
@@ -385,7 +385,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "version",
         nargs="?",
-        help="Target version, for example 0.11.0",
+        help="Target version, for example 0.11.1",
     )
     parser.add_argument(
         "--bump",

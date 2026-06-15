@@ -141,8 +141,17 @@ class Config(dict):
                     return loads(x.value)
                 return super().construct_object(x, deep)
 
+        def wrap_mapping(obj):
+            if isinstance(obj, Mapping):
+                return Config({k: wrap_mapping(v) for k, v in obj.items()})
+            if isinstance(obj, list):
+                return [wrap_mapping(v) for v in obj]
+            if isinstance(obj, tuple):
+                return tuple(wrap_mapping(v) for v in obj)
+            return obj
+
         stream = StringIO(s)
-        config = Config(yaml.load(stream, Loader=ConfitYamlLoader))
+        config = wrap_mapping(yaml.load(stream, Loader=ConfitYamlLoader))
         if resolve:
             return config.resolve(registry=registry)
 

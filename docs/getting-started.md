@@ -41,6 +41,20 @@ class BigModel:
 
 + @app.command(name="script", registry=registry)
 def func(modelA: BigModel, modelB: BigModel, other: int, seed: int):
+    """
+    Run the configured models.
+
+    Parameters
+    ----------
+    modelA : BigModel
+        The first model.
+    modelB : BigModel
+        The second model.
+    other : int
+        Value printed by the command.
+    seed : int
+        Random seed.
+    """
     assert modelA.submodel is modelB.submodel
     assert modelA.date == datetime.date(2010, 10, 10)
     print("Other:", other)
@@ -114,6 +128,37 @@ Create a new config file
 
     You can pass multiple configuration files by repeating the `--config` option. Configuration will be merged in order.
 
+The same command also exposes a readable help message, including `--config`,
+typed parameters and nested field overrides:
+
+```bash { data-md-color-scheme="slate" }
+python script.py --help
+```
+
+```text
+Run the configured models.
+
+Parameters
+----------
+  --config <Path>
+    Load a config file to fill in the following params. Can be repeated.
+
+  --modelA <BigModel>
+    The first model.
+
+    --modelA.<field> VALUE
+
+  --modelB <BigModel>
+    The second model.
+
+    --modelB.<field> VALUE
+
+  --other <int>
+    Value printed by the command.
+
+  --seed <int>
+    Random seed.
+```
 
 You can still call the `function` method from your code, but now also benefit from argument validation !
 

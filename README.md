@@ -54,6 +54,18 @@ class BigModel:
 # you can use @confit.validate_arguments instead if you don't plan on using the CLI
 + @app.command(name="script", registry=registry)
 def func(modelA: BigModel, modelB: BigModel, seed: int = 42):
+    """
+    Display the configured model dates.
+
+    Parameters
+    ----------
+    modelA : BigModel
+        The first model whose date is displayed.
+    modelB : BigModel
+        The second model whose date is displayed.
+    seed : int
+        Random seed.
+    """
     assert modelA.submodel is modelB.submodel
     print("modelA.date:", modelA.date.strftime("%B %-d, %Y"))
     print("modelB.date:", modelB.date.strftime("%B %-d, %Y"))
@@ -98,6 +110,35 @@ python script.py --config config.cfg --seed 43
 ```
 
 </div>
+
+The generated CLI also has a readable help message based on the function
+signature and docstrings:
+
+```bash
+python script.py --help
+```
+
+```text
+Display the configured model dates.
+
+Parameters
+----------
+  --config <Path>
+    Load a config file to fill in the following params. Can be repeated.
+
+  --modelA <BigModel>
+    The first model whose date is displayed.
+
+    --modelA.<field> VALUE
+
+  --modelB <BigModel>
+    The second model whose date is displayed.
+
+    --modelB.<field> VALUE
+
+  --seed <int> (default: 42)
+    Random seed.
+```
 
 You can still call the `function` method from your code, but now also benefit from
 argument validation !

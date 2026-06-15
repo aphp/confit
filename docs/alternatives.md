@@ -17,7 +17,7 @@ Confit also adds support for command-line interfaces by either passing a config 
 
 ### Typer
 
-[Typer](https://github.com/tiangolo/typer) is a CLI library that focuses on providing easy-to-use functionalities for building command-line interface. While Typer offers excellent CLI support and basic argument validation, it does not have configuration file-related features such as loading, exporting, or parameter validation like Confit does. Confit relies on Typer for its CLI support, but adds config file arguments and instantiating classes from a registry, both of which are not available in Typer.
+[Typer](https://github.com/tiangolo/typer) is a CLI library that focuses on providing easy-to-use functionalities for building command-line interface. While Typer offers excellent CLI support and basic argument validation, it does not have configuration file-related features such as loading, exporting, or parameter validation like Confit does. Confit's CLI is smaller and configuration-first, with readable help text, config file arguments and instantiating classes from a registry.
 
 However, if your primary focus is on building a robust CLI, Typer is a strong alternative.
 

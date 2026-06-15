@@ -3,7 +3,7 @@
 Confit is a complete and easy-to-use configuration framework aimed at improving the reproducibility of experiments by relying on the Python typing system, minimal configuration files and command line interfaces.
 
 The three pillars of this configuration system are the [catalogue](https://github.com/explosion/catalogue) registry,
-the [Pydantic](https://github.com/pydantic/pydantic) validation system and the [typer](https://github.com/tiangolo/typer) CLI library.
+the [Pydantic](https://github.com/pydantic/pydantic) validation system and a small configuration-first CLI.
 
 ## Registry
 
@@ -50,7 +50,7 @@ Combined with our configuration system, dictionaries passed as arguments to a de
 
 ## CLI
 
-We provide the `confit.Cli` object, a Typer-based wrapper that turns a regular function into a command line interface. Once decorated with `@app.command`, the function can be executed from the terminal and automatically accepts one or several `--config` files containing its parameters, as well as parameter-wise overrides.
+We provide the `confit.Cli` object, a small wrapper that turns a regular function into a command line interface. Once decorated with `@app.command`, the function can be executed from the terminal and automatically accepts one or several `--config` files containing its parameters, as well as parameter-wise overrides.
 
 For instance, we'll decorate the `cool_function` function to make it available as a command line interface, and put some of its parameters in a configuration file `config.yml`:
 
@@ -78,6 +78,18 @@ def cool_function(
     modelB,
     seed: int = 0,
 ):
+    """
+    Train a model.
+
+    Parameters
+    ----------
+    modelA : MyClass
+        First model to use.
+    modelB
+        Second model to use.
+    seed : int
+        Random seed.
+    """
     ...
 
 
@@ -110,6 +122,33 @@ python script.py --config config.yml --seed 42
 
 Command line arguments override values from the configuration. If multiple
 configuration files are provided, they are merged in order.
+
+The generated help text is plain and mirrors the function docstring and type
+annotations:
+
+```bash
+python script.py --help
+```
+
+```text
+Train a model.
+
+Parameters
+----------
+  --config <Path>
+    Load a config file to fill in the following params. Can be repeated.
+
+  --modelA <MyClass>
+    First model to use.
+
+    --modelA.<field> VALUE
+
+  --modelB <Any>
+    Second model to use.
+
+  --seed <int> (default: 0)
+    Random seed.
+```
 
 ## The Config object
 

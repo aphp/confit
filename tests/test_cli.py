@@ -1,13 +1,78 @@
 import datetime
+import io
+import os
 import random
+import re
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
+from typing import List, Literal, Optional, Union
 
 import pytest
-from typer.testing import CliRunner
 
 from confit import Cli, Config, Registry
 from confit.registry import PYDANTIC_V1, RegistryCollection, set_default_registry
 
+
+@dataclass
+class CliResult:
+    exit_code: int
+    stdout: str
+    stderr: str
+    exception: Exception | None = None
+
+    @property
+    def output(self):
+        return self.stdout + self.stderr
+
+
+class CliRunner:
+    def invoke(self, app, args, env=None):
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        previous_env = os.environ.copy()
+        if env is not None:
+            os.environ.update(env)
+        try:
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                app.main(args=list(args))
+            return CliResult(0, stdout.getvalue(), stderr.getvalue())
+        except SystemExit as e:
+            code = e.code if isinstance(e.code, int) else 1
+            return CliResult(code, stdout.getvalue(), stderr.getvalue(), e)
+        except Exception as e:
+            return CliResult(1, stdout.getvalue(), stderr.getvalue(), e)
+        finally:
+            os.environ.clear()
+            os.environ.update(previous_env)
+
+
 runner = CliRunner()
+
+
+def result_text(result):
+    return "\n".join(
+        str(part)
+        for part in (result.output, result.stdout, result.stderr, result.exception)
+        if part
+    )
+
+
+def make_multi_command_app():
+    multi_app = Cli(pretty_exceptions_show_locals=False)
+
+    @multi_app.command(name="first")
+    def first(value: int = 1):
+        print(f"first: {value}")
+
+    @multi_app.command(name="second")
+    def second(value: int = 2):
+        print(f"second: {value}")
+
+    return multi_app
+
+
+def strip_ansi(text):
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 class registry(RegistryCollection):
@@ -19,6 +84,33 @@ set_default_registry(registry)
 
 class CustomClass:
     pass
+
+
+class LinkedHelpModel:
+    def __init__(self, value: int, label: str = "default"):
+        """
+        Linked help target.
+
+        Parameters
+        ----------
+        value : int
+            Nested value.
+        label : str
+            Nested label.
+        """
+
+
+def linked_help_function(value: int, enabled: bool = True):
+    """
+    Linked function help target.
+
+    Parameters
+    ----------
+    value : int
+        Function value.
+    enabled : bool
+        Whether it is enabled.
+    """
 
 
 @registry.factory.register("submodel")
@@ -62,6 +154,187 @@ def test_cli_working(change_test_dir):
     assert "Other: 4" in result.stdout
 
 
+def test_cli_call_delegates_to_main():
+    call_app = Cli(pretty_exceptions_show_locals=False)
+
+    @call_app.command(name="script")
+    def call_command():
+        print("called")
+
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        call_app([])
+
+    assert stdout.getvalue() == "called\n"
+
+
+def test_cli_explicit_command_in_multi_command_app():
+    multi_app = make_multi_command_app()
+    result = runner.invoke(multi_app, ["first", "--value", "3"])
+
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "first: 3\n"
+
+
+def test_cli_multi_command_top_level_help():
+    multi_app = make_multi_command_app()
+    result = runner.invoke(multi_app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "Commands:\n  first\n  second" in result.stdout
+
+
+def test_cli_multi_command_without_command_args_shows_help():
+    multi_app = make_multi_command_app()
+    result = runner.invoke(multi_app, ["first"])
+
+    assert result.exit_code == 0
+    assert "Commands:\n  first\n  second" in result.stdout
+
+
+def test_cli_accepts_config_equals_path(change_test_dir):
+    result = runner.invoke(
+        app,
+        [
+            "--config=config.cfg",
+            "--modelA.date",
+            "2010-10-10",
+            "--other",
+            "4",
+            "--seed=42",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "Other: 4" in result.stdout
+
+
+def test_cli_help_formats_common_annotations():
+    help_app = Cli(pretty_exceptions_show_locals=False)
+
+    @help_app.command(name="script")
+    def typed_command(
+        untyped,
+        maybe: Optional[int] = None,
+        choice: Literal["small", "large"] = "small",
+        numbers: list[int] | None = None,
+        lookup: dict[str, int] | None = None,
+        legacy_values: List = None,
+        either: Union[int, str] = 1,
+    ):
+        pass
+
+    result = runner.invoke(help_app, ["--help"])
+
+    help_text = strip_ansi(result.stdout)
+    assert result.exit_code == 0
+    assert "--untyped <Any>" in help_text
+    assert "--maybe <Optional[int]> (default: None)" in help_text
+    assert "--choice <Literal['small', 'large']> (default: 'small')" in help_text
+    assert "--numbers <Optional[list[int]]> (default: None)" in help_text
+    assert "--lookup <Optional[dict[str, int]]> (default: None)" in help_text
+    assert "--lookup.<field> VALUE" in help_text
+    assert "--legacy_values <list> (default: None)" in help_text
+    assert "--either <Union[int, str]> (default: 1)" in help_text
+
+
+def test_cli_help_expands_linked_docstrings():
+    linked_app = Cli(pretty_exceptions_show_locals=False)
+
+    @linked_app.command(name="script")
+    def linked_command(model: dict, direct: dict):
+        pass
+
+    linked_app.commands["script"]["fn"].__doc__ = f"""
+    Run linked help.
+
+    Parameters
+    ----------
+    model : dict
+        Model settings.
+
+        ??? note
+            ::: {__name__}.LinkedHelpModel
+        More model details.
+    direct : dict
+        ::: {__name__}.linked_help_function
+    """
+
+    result = runner.invoke(linked_app, ["--help"])
+
+    help_text = strip_ansi(result.stdout)
+    assert result.exit_code == 0
+    assert f"Details for {__name__}.LinkedHelpModel:" in help_text
+    assert f"Details for {__name__}.linked_help_function:" in help_text
+    assert "More model details." in help_text
+    assert "--model.value <int>" in help_text
+    assert "--model.label <str>" in help_text
+    assert "--direct.value <int>" in help_text
+    assert "--direct.enabled <bool>" in help_text
+    assert "???" not in help_text
+    assert ":::" not in help_text
+
+
+def test_cli_help_shows_config_overrides():
+    result = runner.invoke(app, ["--help"])
+    help_text = strip_ansi(result.stdout)
+    assert result.exit_code == 0, result.stdout
+    assert "\x1b[1m--modelA\x1b[0m" in result.stdout
+    assert "Confit overrides:" not in help_text
+    assert "--config <Path>" in help_text
+    assert "Load a config file to fill in the following params" in help_text
+    assert "--modelA <BigModel>" in help_text
+    assert "--modelA.<field> VALUE" in help_text
+    assert "--other <int>" in help_text
+    assert "v__duplicate_kwargs" not in help_text
+
+
+def test_edsnlp_train_help_shows_config_overrides():
+    try:
+        edsnlp_train = pytest.importorskip("edsnlp.train")
+        from edsnlp.core.registries import registry as edsnlp_registry
+
+        set_default_registry(edsnlp_registry)
+        result = runner.invoke(edsnlp_train.app, ["--help"])
+    finally:
+        set_default_registry(registry)
+
+    help_text = strip_ansi(result.stdout)
+    assert result.exit_code == 0, result.stdout
+    assert "\x1b[1m--train_data\x1b[0m" in result.stdout
+    assert "Train a pipeline.\n\nParameters" in help_text
+    assert "Confit overrides:" not in help_text
+    assert "--config <Path>" in help_text
+    assert "Load a config file to fill in the following params" in help_text
+    assert "--nlp <Pipeline>" in help_text
+    assert "--nlp.<field> VALUE" in help_text
+    assert "--config <Path>\n    Load a config file" in help_text
+    assert "--nlp <Pipeline>\n    The pipeline" in help_text
+    assert "--nlp.<field> VALUE\n\n  --train_data" in help_text
+    assert "--train_data <AsList[TrainingData]>" in help_text
+    assert "--train_data.data <Stream>" in help_text
+    assert "--train_data.batch_size <BatchSizeArg>" in help_text
+    assert "--max_steps <int> (default: 1000)" in help_text
+    assert "--seed <int> (default: 42)" in help_text
+    assert "--validation_interval <Optional[int]> (default: None)" in help_text
+    assert "--validation_interval.<field> VALUE" not in help_text
+    assert "Details for edsnlp.training.trainer.TrainingData:" in help_text
+    assert "A training data object." in help_text
+    assert "Details for edsnlp.training.optimizer.ScheduledOptimizer:" in help_text
+    assert "Wrapper optimizer that supports schedules" in help_text
+    assert "Base class for all optimizers." not in help_text
+    assert "Details for edsnlp.training.trainer.GenericScorer:" in help_text
+    assert "--scorer.batch_size <Union[int, str]>" in help_text
+    assert "--scorer.speed <bool>" in help_text
+    assert "--scorer.autocast <Union[bool, Any]>" in help_text
+    assert "--scorer.metrics.<field> <Any>" in help_text
+    assert "--scorer.<field> VALUE" not in help_text
+    assert "Returns" not in help_text
+    assert ":::" not in help_text
+    assert "only_parameters" not in help_text
+    assert "v__duplicate_kwargs" not in help_text
+
+
 def test_cli_missing_debug(change_test_dir):
     result = runner.invoke(
         app,
@@ -98,13 +371,14 @@ def test_cli_missing_no_debug(change_test_dir):
         ],
     )
     assert result.exit_code == 1
+    text = result_text(result)
+    assert ("2 validation errors for ") in text
     assert (
-        "2 validation errors for test_cli.function()\n"
         "-> script.modelA.submodel\n"
         "   field required\n"
         "-> script.modelB\n"
         "   field required"
-    ) in str(result.stdout)
+    ) in text
 
 
 def test_cli_merge(change_test_dir):
@@ -418,11 +692,8 @@ value = 44
     # This should fail because modelA is not defined and we're not merging
     # with default
     assert result.exit_code == 1
-    assert (
-        "field required" in str(result.stdout)
-        or "field required" in str(result.exception)
-        or "modelA" in str(result.exception)
-    )
+    text = result_text(result)
+    assert "field required" in text or "modelA" in text
 
 
 def test_cli_default_config_with_command_line_override():

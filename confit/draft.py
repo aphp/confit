@@ -16,6 +16,7 @@ from typing_extensions import ParamSpec, Protocol
 from confit.errors import (
     ConfitValidationError,
     ErrorWrapper,
+    patch_errors,
     to_legacy_error,
 )
 from confit.typing import cast
@@ -153,9 +154,11 @@ class Draft(Generic[R], metaclass=MetaDraft):
         self,
         func: Callable[P, R],
         kwargs: Dict[str, Any],
+        loc=(),
     ):
         self._func = func
         self._kwargs = kwargs
+        self._loc = tuple(loc)
         return_type = inspect.signature(func).return_annotation
         if isinstance(return_type, str):
             raise RuntimeError(
@@ -177,7 +180,14 @@ class Draft(Generic[R], metaclass=MetaDraft):
 
         # Order matters: priority is given to the kwargs provided
         # by the user, so most likely when the Partial is instantiated
-        res = self._func(**{**kwargs, **self._kwargs})
+        try:
+            res = self._func(**{**kwargs, **self._kwargs})
+        except ConfitValidationError as e:
+            raise ConfitValidationError(
+                patch_errors(e.raw_errors, self._loc, self._kwargs),
+                model=e.model,
+                name=getattr(e, "name", None),
+            ).with_traceback(e.__traceback__)
         return res
 
     def _raise_draft_error(self):

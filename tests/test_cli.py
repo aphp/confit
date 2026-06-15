@@ -335,6 +335,93 @@ def test_edsnlp_train_help_shows_config_overrides():
     assert "v__duplicate_kwargs" not in help_text
 
 
+def test_edsnlp_train_missing_pipe_parameter_error(tmp_path):
+    try:
+        edsnlp_train = pytest.importorskip("edsnlp.train")
+        from edsnlp.core.registries import registry as edsnlp_registry
+
+        set_default_registry(edsnlp_registry)
+        config_path = tmp_path / "missing-pipe-param.yml"
+        config_path.write_text(
+            """
+nlp:
+  '@core': pipeline
+  lang: eds
+  components:
+    qualifier:
+      '@factory': eds.span_classifier
+      attributes: [ 'negation' ]
+      span_getter: [ 'ents' ]
+
+train_data: []
+
+train:
+  nlp: ${nlp}
+  train_data: ${train_data}
+  max_steps: 1
+  cpu: true
+  logger: false
+"""
+        )
+
+        result = runner.invoke(edsnlp_train.app, ["--config", str(config_path)])
+    finally:
+        set_default_registry(registry)
+
+    text = result_text(result)
+    assert result.exit_code == 1
+    assert "Validation error: 1 validation error for " in text
+    assert "TrainableSpanClassifier()" in text
+    assert "-> train.nlp.components.qualifier.embedding" in text
+    assert "field required" in text
+
+
+def test_edsnlp_train_optimizer_parameter_error(tmp_path):
+    try:
+        edsnlp_train = pytest.importorskip("edsnlp.train")
+        from edsnlp.core.registries import registry as edsnlp_registry
+
+        set_default_registry(edsnlp_registry)
+        config_path = tmp_path / "bad-optimizer-param.yml"
+        config_path.write_text(
+            f"""
+nlp:
+  '@core': pipeline
+  lang: eds
+
+optimizer:
+  '@core': optimizer !draft
+  optim: AdamW
+  groups:
+    '.*':
+      lr: 1e-3
+  total_steps: invalid
+
+train_data: []
+
+train:
+  nlp: ${{nlp}}
+  train_data: ${{train_data}}
+  max_steps: 1
+  cpu: true
+  logger: false
+  output_dir: {str(tmp_path / "train-artifacts")!r}
+  optimizer: ${{optimizer}}
+"""
+        )
+
+        result = runner.invoke(edsnlp_train.app, ["--config", str(config_path)])
+    finally:
+        set_default_registry(registry)
+
+    text = result_text(result)
+    assert result.exit_code == 1
+    assert "Validation error: 1 validation error for ScheduledOptimizer()" in text
+    assert "-> train.optimizer.total_steps" in text
+    assert "input should be a valid integer" in text
+    assert "got 'invalid' (str)" in text
+
+
 def test_cli_missing_debug(change_test_dir):
     result = runner.invoke(
         app,

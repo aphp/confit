@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Explicit version to release, e.g. 0.11.0"
+        description: "Explicit version to release, e.g. 0.11.1"
         required: false
         type: string
       bump:

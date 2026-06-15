@@ -445,7 +445,7 @@ class Config(dict):
                     fn = registry_value.get(value)
                     try:
                         if is_draft:
-                            resolved = Draft(fn, params)
+                            resolved = Draft(fn, params, loc)
                         else:
                             resolved = fn(**params)
                         # The `validate_arguments` decorator has most likely

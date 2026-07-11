@@ -181,3 +181,32 @@ func(
     seed=seed,
 )
 ```
+
+## Subcommands
+
+Compose Confit applications with `add_subcommands`:
+
+```python
+from confit import Cli
+
+app = Cli()
+training = Cli()
+
+
+@training.command(name="run")
+def run(epochs: int = 10):
+    print(f"Training for {epochs} epochs")
+
+
+app.add_subcommands(training, name="training", help="Training commands")
+```
+
+The command accepts the same configuration and override arguments as a top-level
+Confit command:
+
+```bash
+python script.py training run --config config.yml --epochs 20
+```
+
+Omit `name` to expose the child commands directly on the parent. Configuration
+sections continue to use the leaf command name, such as `run` in this example.

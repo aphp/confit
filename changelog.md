@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Restore nested CLI applications with `Cli.add_subcommands()`. Confit CLI objects
+  can temporarily still be mounted under Typer applications without making Typer
+  a Confit dependency. `Cli.add_typer()` and Typer mounting now emit a visible
+  deprecation warning and will be removed in the next major release.
 - When a class instantiation is recorded by multiple factories (e.g. edsnlp's `load_pipe` which in turns calls the pipe architecture factory), we don't overwrite the instance origin and instead make it accessible to the config serializer via `__confit_serialization_origin__ = 'first'|'last'` on registered objects to decide which factory config to use when serializing the object.
 
 ## v0.11.1 (2026-06-15)

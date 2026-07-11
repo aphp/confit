@@ -219,6 +219,29 @@ ConfitValidationError: 2 validation errors for __main__.func()
 
 Visit the [documentation](https://aphp.github.io/confit/) for more information!
 
+### Subcommands
+
+Confit applications can be composed into groups of subcommands:
+
+```python
+app = Cli()
+training = Cli()
+
+
+@training.command(name="run")
+def run(epochs: int = 10):
+    print(f"Training for {epochs} epochs")
+
+
+app.add_subcommands(training, name="training")
+```
+
+Run the nested command with:
+
+```bash
+python script.py training run --config config.yml --epochs 20
+```
+
 ## Acknowledgement
 
 We would like to thank [Assistance Publique – Hôpitaux de Paris](https://www.aphp.fr/)

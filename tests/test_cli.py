@@ -1,8 +1,10 @@
 import datetime
+import importlib
 import io
 import os
 import random
 import re
+import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from typing import List, Literal, Optional, Union
@@ -10,7 +12,12 @@ from typing import List, Literal, Optional, Union
 import pytest
 
 from confit import Cli, Config, Registry
-from confit.registry import PYDANTIC_V1, RegistryCollection, set_default_registry
+from confit.registry import (
+    PYDANTIC_V1,
+    RegistryCollection,
+    VisibleDeprecationWarning,
+    set_default_registry,
+)
 
 
 @dataclass
@@ -194,6 +201,168 @@ def test_cli_explicit_command_without_overrides_runs():
 
     assert result.exit_code == 0, result_text(result)
     assert result.stdout == "first: 1\n"
+
+
+def test_cli_subcommands_support_groups_flattening_nesting_and_help():
+    root = Cli()
+    training = Cli()
+    conversions = Cli()
+    admin = Cli()
+    jobs = Cli()
+
+    @training.command(name="run")
+    def run(value: int = 1):
+        print(f"run: {value}")
+
+    @conversions.command(name="convert")
+    def convert(value: int):
+        print(f"converted: {value}")
+
+    @jobs.command(name="execute")
+    def execute():
+        print("executed")
+
+    root.add_subcommands(
+        training,
+        name="training",
+        help="Manage training runs",
+        short_help="Training commands",
+        deprecated=True,
+    )
+    root.add_subcommands(conversions)
+    admin.add_subcommands(jobs, name="jobs")
+    root.add_subcommands(admin, name="admin")
+    root.add_subcommands(Cli(), name="internal", hidden=True)
+
+    result = runner.invoke(root, ["training", "run", "--value", "3"])
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "run: 3\n"
+
+    result = runner.invoke(root, ["convert", "--value", "4"])
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "converted: 4\n"
+
+    result = runner.invoke(root, ["admin", "jobs", "execute"])
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "executed\n"
+
+    result = runner.invoke(root, ["--help"])
+    assert result.exit_code == 0
+    assert "training (deprecated)  Training commands" in result.stdout
+    assert "convert" in result.stdout
+    assert "internal" not in result.stdout
+
+    result = runner.invoke(root, ["training", "--help"])
+    assert result.exit_code == 0
+    assert result.stdout == "Manage training runs\n\nCommands:\n  run\n"
+
+    result = runner.invoke(root, [])
+    assert result.exit_code == 0
+    assert result.stdout.startswith("Commands:\n")
+
+    result = runner.invoke(root, ["unknown"])
+    assert result.exit_code == 1
+    assert str(result.exception) == "Missing command"
+
+
+def test_cli_add_typer_alias_and_native_paths_do_not_import_typer(monkeypatch):
+    root = Cli()
+    child = Cli()
+    native = Cli()
+
+    @child.command(name="run")
+    def run():
+        print("legacy")
+
+    @native.command(name="run")
+    def native_run():
+        print("native")
+
+    with pytest.warns(VisibleDeprecationWarning, match="add_subcommands"):
+        root.add_typer(child, name="legacy")
+
+    original_import_module = importlib.import_module
+
+    def reject_typer_import(name, package=None):
+        if name == "typer":
+            raise AssertionError("native execution imported typer")
+        return original_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", reject_typer_import)
+
+    result = runner.invoke(root, ["legacy", "run"])
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "legacy\n"
+
+    result = runner.invoke(native, [])
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "native\n"
+
+
+def test_cli_typer_bridge_is_lazy_nested_rebuildable_and_reports_missing_dependency(
+    monkeypatch,
+):
+    typer = pytest.importorskip("typer")
+    typer_testing = pytest.importorskip("typer.testing")
+    confit_app = Cli(add_completion=False)
+    nested_app = Cli(add_completion=False)
+
+    @confit_app.command(name="first")
+    def first(value: int = 1):
+        print(f"first: {value}")
+
+    @nested_app.command(name="deep")
+    def deep():
+        print("deep")
+
+    confit_app.add_subcommands(nested_app, name="nested")
+
+    typer_app = typer.Typer(add_completion=False)
+    typer_app.add_typer(confit_app, name="config")
+    assert confit_app.typer_cli is None
+
+    with pytest.warns(VisibleDeprecationWarning, match="next major") as warning_record:
+        result = typer_testing.CliRunner().invoke(
+            typer_app,
+            ["config", "first", "--value", "2"],
+        )
+    assert result.exit_code == 0, result.output
+    assert result.output == "first: 2\n"
+    assert len(warning_record) == 2
+
+    result = typer_testing.CliRunner().invoke(
+        typer_app,
+        ["config", "nested", "deep"],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == "deep\n"
+
+    @confit_app.command(name="second")
+    def second():
+        print("second")
+
+    assert confit_app.typer_cli is None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = typer_testing.CliRunner().invoke(
+            typer_app,
+            ["config", "second"],
+        )
+    assert result.exit_code == 0, result.output
+    assert result.output == "second\n"
+    assert not [w for w in caught if isinstance(w.message, VisibleDeprecationWarning)]
+
+    app_without_typer = Cli()
+    original_import_module = importlib.import_module
+
+    def reject_typer_import(name, package=None):
+        if name == "typer":
+            raise ImportError("missing")
+        return original_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", reject_typer_import)
+    with pytest.raises(ImportError, match="declare a dependency on 'typer'"):
+        app_without_typer.get_typer_cli()
 
 
 def test_cli_accepts_config_equals_path(change_test_dir):

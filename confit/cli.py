@@ -2,6 +2,7 @@ import importlib
 import inspect
 import re
 import sys
+import warnings
 from pathlib import Path
 from types import UnionType
 from typing import (
@@ -19,7 +20,7 @@ from typing import (
 
 from .config import Config, merge_from_disk
 from .errors import ConfitValidationError, LegacyValidationError, patch_errors
-from .registry import validate_arguments
+from .registry import VisibleDeprecationWarning, validate_arguments
 from .utils.random import set_seed
 from .utils.settings import is_debug
 from .utils.xjson import loads
@@ -75,6 +76,11 @@ class Cli:
 
     def __init__(self, *args: Any, **kwargs: Any):
         self.commands = {}
+        self.subcommands = []
+        self.typer_args = args
+        self.typer_kwargs = kwargs
+        self.typer_cli = None
+        self.typer_warning_emitted = False
 
     # User code calls this as a decorator to register one command.
     # The stored metadata is used by main.
@@ -104,13 +110,187 @@ class Cli:
                 "fn": fn,
                 "validated": validated,
                 "help": help,
+                "typer_options": {
+                    "cls": cls,
+                    "context_settings": context_settings,
+                    "help": help,
+                    "epilog": epilog,
+                    "short_help": short_help,
+                    "options_metavar": options_metavar,
+                    "add_help_option": add_help_option,
+                    "no_args_is_help": no_args_is_help,
+                    "hidden": hidden,
+                    "deprecated": deprecated,
+                    "rich_help_panel": rich_help_panel,
+                },
                 "registry": registry,
                 "default_config": default_config,
                 "merge_with_default_config": merge_with_default_config,
             }
+            self.typer_cli = None
             return validated
 
         return wrapper
+
+    def add_subcommands(
+        self,
+        cli: "Cli",
+        *,
+        name: Optional[str] = None,
+        help: Optional[str] = None,
+        short_help: Optional[str] = None,
+        hidden: bool = False,
+        deprecated: bool = False,
+    ) -> None:
+        """Add another Confit CLI as a group or flattened command entries"""
+        if not isinstance(cli, Cli):
+            raise TypeError("add_subcommands expects a Confit Cli instance")
+        self.subcommands.append(
+            {
+                "cli": cli,
+                "name": name,
+                "help": help,
+                "short_help": short_help,
+                "hidden": hidden,
+                "deprecated": deprecated,
+            }
+        )
+        self.typer_cli = None
+
+    def add_typer(
+        self,
+        cli: "Cli",
+        *,
+        name: Optional[str] = None,
+        help: Optional[str] = None,
+        short_help: Optional[str] = None,
+        hidden: bool = False,
+        deprecated: bool = False,
+    ) -> None:
+        """Add Confit subcommands through the deprecated Typer compatible name"""
+        warnings.warn(
+            "Cli.add_typer() is deprecated, use Cli.add_subcommands() instead.",
+            VisibleDeprecationWarning,
+            stacklevel=2,
+        )
+        self.add_subcommands(
+            cli,
+            name=name,
+            help=help,
+            short_help=short_help,
+            hidden=hidden,
+            deprecated=deprecated,
+        )
+
+    def command_entries(self):
+        """Return the command and group entries used by dispatch and help"""
+        entries = {
+            name: {"kind": "command", "cli": self, "command": command}
+            for name, command in self.commands.items()
+        }
+        for group in self.subcommands:
+            if group["name"] is None:
+                entries.update(group["cli"].command_entries())
+            else:
+                entries[group["name"]] = {
+                    "kind": "group",
+                    "cli": group["cli"],
+                    "group": group,
+                }
+        return entries
+
+    def format_commands_help(self):
+        """Render the visible commands and groups for the current CLI level"""
+        lines = ["Commands:"]
+        for name, entry in self.command_entries().items():
+            if entry["kind"] == "command":
+                options = entry["command"]["typer_options"]
+            else:
+                options = entry["group"]
+            if options["hidden"]:
+                continue
+            description = options.get("short_help") or options.get("help")
+            suffix = " (deprecated)" if options["deprecated"] else ""
+            if description:
+                description = inspect.cleandoc(description).splitlines()[0]
+                lines.append(f"  {name}{suffix}  {description}")
+            else:
+                lines.append(f"  {name}{suffix}")
+        return "\n".join(lines)
+
+    def get_typer_cli(self):
+        """Build and cache the Typer representation read by external Typer apps"""
+        if self.typer_cli is not None:
+            return self.typer_cli
+        try:
+            typer = importlib.import_module("typer")
+        except ImportError as e:
+            raise ImportError(
+                "Typer interoperability requires the application to install "
+                "and declare a dependency on 'typer'."
+            ) from e
+
+        if not self.typer_warning_emitted:
+            warnings.warn(
+                "Adapting a Confit Cli for Typer is deprecated and will be removed "
+                "in the next major Confit release.",
+                VisibleDeprecationWarning,
+                stacklevel=3,
+            )
+            self.typer_warning_emitted = True
+
+        typer_cli = typer.Typer(*self.typer_args, **self.typer_kwargs)
+        for name, command in self.commands.items():
+            options = dict(command["typer_options"])
+            options["context_settings"] = {
+                **(options["context_settings"] or {}),
+                "ignore_unknown_options": True,
+                "allow_extra_args": True,
+            }
+
+            def create_callback(command_name, command_record):
+                def callback(
+                    ctx: typer.Context,
+                    config: Optional[List[Path]] = None,
+                ):
+                    return self.run_command(
+                        command_name,
+                        command_record,
+                        config,
+                        list(ctx.args),
+                    )
+
+                return callback
+
+            typer_cli.command(name=name, **options)(create_callback(name, command))
+
+        for group in self.subcommands:
+            typer_cli.add_typer(
+                group["cli"],
+                name=group["name"],
+                help=group["help"],
+                short_help=group["short_help"],
+                hidden=group["hidden"],
+                deprecated=group["deprecated"],
+            )
+        self.typer_cli = typer_cli
+        return typer_cli
+
+    @property
+    def registered_commands(self):
+        return self.get_typer_cli().registered_commands
+
+    @property
+    def registered_groups(self):
+        return self.get_typer_cli().registered_groups
+
+    @property
+    def registered_callback(self):
+        return self.get_typer_cli().registered_callback
+
+    @property
+    def info(self):
+        return self.get_typer_cli().info
 
     def __call__(self, args: Optional[List[str]] = None):
         return self.main(args=args)
@@ -119,23 +299,37 @@ class Cli:
     # It either prints help or executes the selected command.
     def main(self, args: Optional[List[str]] = None):
         args = list(sys.argv[1:] if args is None else args)
-        commands_help = "\n".join(
-            ["Commands:", *(f"  {name}" for name in self.commands)]
-        )
-
-        # The command name is optional for single command apps.
-        # args is left with only config paths and overrides.
-        if args and args[0] in self.commands:
-            name = args.pop(0)
-            command = self.commands[name]
-        elif len(self.commands) == 1:
-            name = next(iter(self.commands))
-            command = self.commands[name]
-        elif args and args[0] in {"--help", "-h"}:
-            print(commands_help)
-            raise SystemExit(0)
-        else:
-            raise Exception("Missing command")
+        cli = self
+        command = None
+        name = None
+        group_help = None
+        while command is None:
+            entries = cli.command_entries()
+            commands_help = cli.format_commands_help()
+            if group_help:
+                commands_help = f"{inspect.cleandoc(group_help)}\n\n{commands_help}"
+            implicit_command = (
+                cli is self and not self.subcommands and len(entries) == 1
+            )
+            if args and args[0] in {"--help", "-h"} and not implicit_command:
+                print(commands_help)
+                raise SystemExit(0)
+            if args and args[0] in entries:
+                name = args.pop(0)
+                entry = entries[name]
+                if entry["kind"] == "group":
+                    cli = entry["cli"]
+                    group_help = entry["group"]["help"]
+                    continue
+                command = entry["command"]
+            elif implicit_command:
+                name, entry = next(iter(entries.items()))
+                command = entry["command"]
+            else:
+                if not args:
+                    print(commands_help)
+                    raise SystemExit(0)
+                raise Exception("Missing command")
 
         if any(arg in {"--help", "-h"} for arg in args):
             print(add_config_overrides_help(command["help"], command["fn"]))

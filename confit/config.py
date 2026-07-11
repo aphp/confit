@@ -24,6 +24,7 @@ from confit.utils.settings import is_debug
 from confit.utils.xjson import Reference, dumps, loads
 
 RESOLVED_TO_CONFIG = WeakKeyDictionary()
+RESOLVED_TO_CONFIGS = WeakKeyDictionary()
 
 Loc = Tuple[Union[int, str]]
 T = TypeVar("T")
@@ -207,6 +208,9 @@ class Config(dict):
         Try to convert non-serializable objects using the RESOLVED_TO_CONFIG object
         back to their original catalogue + params form
 
+        Objects can set `__confit_serialization_origin__` to `"first"` to use
+        their first recorded origin instead of the latest origin
+
         We try to preserve referential equalities between non dict/list/tuple
         objects by serializing subsequent references to the same object as references
         to its first occurrence in the tree.
@@ -258,7 +262,13 @@ class Config(dict):
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
             cfg = None
             try:
-                cfg = (cfg or Config()).merge(RESOLVED_TO_CONFIG[o])
+                try:
+                    origins = RESOLVED_TO_CONFIGS[o]
+                    origin = getattr(o, "__confit_serialization_origin__", "last")
+                    origin_config = origins[0] if origin == "first" else origins[-1]
+                except KeyError:
+                    origin_config = RESOLVED_TO_CONFIG[o]
+                cfg = (cfg or Config()).merge(origin_config)
             except (KeyError, TypeError):
                 pass
             try:
@@ -598,7 +608,7 @@ class Config(dict):
     @classmethod
     def _store_resolved(cls, resolved: Any, config: Dict[str, Any]):
         """
-        Adds a resolved object to the RESOLVED_TO_CONFIG dict
+        Adds a resolved object and its origin to the serialization mappings
         for later retrieval during serialization
         ([`.serialize`][confit.config.Config.serialize])
 
@@ -609,6 +619,8 @@ class Config(dict):
         """
         try:
             RESOLVED_TO_CONFIG[resolved] = config
+            origins = RESOLVED_TO_CONFIGS.setdefault(resolved, [])
+            origins.append(config)
         except TypeError:
             pass
 

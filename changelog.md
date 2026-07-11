@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- When a class instantiation is recorded by multiple factories (e.g. edsnlp's `load_pipe` which in turns calls the pipe architecture factory), we don't overwrite the instance origin and instead make it accessible to the config serializer via `__confit_serialization_origin__ = 'first'|'last'` on registered objects to decide which factory config to use when serializing the object.
+
 ## v0.11.1 (2026-06-15)
 
 - Fix package source discovery

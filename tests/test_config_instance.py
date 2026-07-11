@@ -17,9 +17,24 @@ class CustomClass:
     pass
 
 
+class FirstOriginClass:
+    __confit_serialization_origin__ = "first"
+
+
 class HeldValue:
     def __init__(self):
         self.value = "A value!"
+
+
+def test_serialization_origin_selection():
+    latest = CustomClass()
+    first = FirstOriginClass()
+    for instance in (latest, first):
+        Config._store_resolved(instance, {"origin": "constructor"})
+        Config._store_resolved(instance, {"origin": "user"})
+
+    assert Config.serialize(latest) == {"origin": "user"}
+    assert Config.serialize(first) == {"origin": "constructor"}
 
 
 @registry.factory.register("submodel")

@@ -137,10 +137,6 @@ class Cli:
         else:
             raise Exception("Missing command")
 
-        if not args and len(self.commands) > 1:
-            print(commands_help)
-            raise SystemExit(0)
-
         if any(arg in {"--help", "-h"} for arg in args):
             print(add_config_overrides_help(command["help"], command["fn"]))
             raise SystemExit(0)

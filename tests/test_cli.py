@@ -188,12 +188,12 @@ def test_cli_multi_command_top_level_help():
     assert "Commands:\n  first\n  second" in result.stdout
 
 
-def test_cli_multi_command_without_command_args_shows_help():
+def test_cli_explicit_command_without_overrides_runs():
     multi_app = make_multi_command_app()
     result = runner.invoke(multi_app, ["first"])
 
-    assert result.exit_code == 0
-    assert "Commands:\n  first\n  second" in result.stdout
+    assert result.exit_code == 0, result_text(result)
+    assert result.stdout == "first: 1\n"
 
 
 def test_cli_accepts_config_equals_path(change_test_dir):

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.12.0 (2026-08-11)
 
 - Restore nested CLI applications with `Cli.add_subcommands()`. Confit CLI objects
   can temporarily still be mounted under Typer applications without making Typer

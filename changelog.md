@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0.dev1 (2026-09-09)
 
 - Support validated functions created with exec without a module name
 - Keep TypeError from legacy custom validators wrapped as validation errors

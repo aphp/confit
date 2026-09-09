@@ -10,10 +10,10 @@ from dataclasses import dataclass
 from typing import List, Literal, Optional, Union
 
 import pytest
+from pydantic import Field
 
 from confit import Cli, Config, Registry
 from confit.registry import (
-    PYDANTIC_V1,
     RegistryCollection,
     VisibleDeprecationWarning,
     set_default_registry,
@@ -54,10 +54,6 @@ class CliRunner:
 
 
 runner = CliRunner()
-requires_pydantic_v2_for_edsnlp = pytest.mark.skipif(
-    PYDANTIC_V1,
-    reason="EDS-NLP tests require pydantic>=2",
-)
 
 
 def result_text(result):
@@ -462,7 +458,6 @@ def test_cli_help_shows_config_overrides():
     assert "v__duplicate_kwargs" not in help_text
 
 
-@requires_pydantic_v2_for_edsnlp
 def test_edsnlp_train_help_shows_config_overrides():
     try:
         edsnlp_train = pytest.importorskip("edsnlp.train")
@@ -509,7 +504,6 @@ def test_edsnlp_train_help_shows_config_overrides():
     assert "v__duplicate_kwargs" not in help_text
 
 
-@requires_pydantic_v2_for_edsnlp
 def test_edsnlp_train_missing_pipe_parameter_error(tmp_path):
     try:
         edsnlp_train = pytest.importorskip("edsnlp.train")
@@ -551,7 +545,6 @@ train:
     assert "field required" in text
 
 
-@requires_pydantic_v2_for_edsnlp
 def test_edsnlp_train_optimizer_parameter_error(tmp_path):
     try:
         edsnlp_train = pytest.importorskip("edsnlp.train")
@@ -592,7 +585,10 @@ train:
 
     text = result_text(result)
     assert result.exit_code == 1
-    assert "Validation error: 1 validation error for ScheduledOptimizer()" in text
+    assert (
+        "Validation error: 1 validation error for "
+        "edsnlp.training.optimizer.ScheduledOptimizer()" in text
+    )
     assert "-> train.optimizer.total_steps" in text
     assert "input should be a valid integer" in text
     assert "got 'invalid' (str)" in text
@@ -721,10 +717,7 @@ def bool_app_function(bool_value: bool, str_value: str):
     print("STR:", str_value)
 
 
-# fail if not PYDANTIC_V1
-
-
-@pytest.mark.xfail(not PYDANTIC_V1, reason="pydantic v2 fails when casting bool to str")
+@pytest.mark.xfail(reason="pydantic v2 fails when casting bool to str")
 def test_cli_bool(change_test_dir):
     result = runner.invoke(
         bool_app,
@@ -759,13 +752,13 @@ class RandModel:
 
 
 @seed_app.command(name="seed", registry=registry)
-def print_seed(model: RandModel, seed: int):
+def print_seed(model: RandModel, seed: int = Field(default=42)):
     print("Value:", model.value)
 
 
 def test_seed(change_test_dir):
-    """Checks that the program running twice will generate the same random numbers"""
-    result = runner.invoke(seed_app, ["--seed", "42", "--model.@factory", "randmodel"])
+    """Default and explicit seeds produce the same random values"""
+    result = runner.invoke(seed_app, ["--model.@factory", "randmodel"])
     assert result.exit_code == 0, result.stdout
     first_seed = int(result.stdout.split(":")[1].strip())
 

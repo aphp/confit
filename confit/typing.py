@@ -1,12 +1,13 @@
+from dataclasses import is_dataclass
 from functools import lru_cache
 from typing import TypeVar
 
-import pydantic
+from pydantic import BaseModel
+from pydantic.type_adapter import ConfigDict, TypeAdapter
+from pydantic_core import core_schema
+from typing_extensions import is_typeddict
 
 T = TypeVar("T")
-
-if pydantic.VERSION >= "2":
-    from pydantic_core import core_schema
 
 
 class Validatable:
@@ -24,35 +25,18 @@ class Validatable:
         )
 
 
-if pydantic.VERSION < "2":
+@lru_cache(maxsize=32)
+def make_type_adapter(type_):
+    config = None
 
-    def cast(type_, obj):
-        class Model(pydantic.BaseModel):
-            __root__: type_
+    if not (
+        (isinstance(type_, type) and issubclass(type_, BaseModel))
+        or is_dataclass(type_)
+        or is_typeddict(type_)
+    ):
+        config = ConfigDict(arbitrary_types_allowed=True)
+    return TypeAdapter(type_, config=config)
 
-            class Config:
-                arbitrary_types_allowed = True
 
-        return Model(__root__=obj).__root__
-
-else:
-    from dataclasses import is_dataclass
-
-    from pydantic import BaseModel
-    from pydantic.type_adapter import ConfigDict, TypeAdapter
-    from typing_extensions import is_typeddict
-
-    @lru_cache(maxsize=32)
-    def make_type_adapter(type_):
-        config = None
-
-        if not (
-            (isinstance(type_, type) and issubclass(type_, BaseModel))
-            or is_dataclass(type_)
-            or is_typeddict(type_)
-        ):
-            config = ConfigDict(arbitrary_types_allowed=True)
-        return TypeAdapter(type_, config=config)
-
-    def cast(type_, obj):
-        return make_type_adapter(type_).validate_python(obj)
+def cast(type_, obj):
+    return make_type_adapter(type_).validate_python(obj)

@@ -11,21 +11,11 @@ from typing import (
 )
 
 import pydantic
+from pydantic_core import core_schema
 from typing_extensions import ParamSpec, Protocol
 
-from confit.errors import (
-    ConfitValidationError,
-    ErrorWrapper,
-    patch_errors,
-    to_legacy_error,
-)
+from confit.errors import ConfitValidationError
 from confit.typing import cast
-
-if pydantic.VERSION >= "2":
-    from pydantic_core import core_schema
-
-
-PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
 
 P = ParamSpec("P")
 R = TypeVar("R", covariant=True)
@@ -94,14 +84,9 @@ class MetaDraft(type):
 
     def validate(cls, value, config=None):
         if not isinstance(value, Draft):
-            raise ConfitValidationError(
-                [
-                    ErrorWrapper(
-                        exc=TypeError(f"Expected {cls}, got {value.__class__}"),
-                        loc=(),
-                    ),
-                ],
-                model=cls,
+            raise ConfitValidationError.from_exception(
+                TypeError(f"Expected {cls}, got {value.__class__}"),
+                source=cls,
                 name=cls.__name__,
             )
         actual = value._func
@@ -115,22 +100,12 @@ class MetaDraft(type):
             else:  # pragma: no cover
                 cast(Union[Type[cls.type_], Callable[..., cls.type_]], actual)
         except pydantic.ValidationError as e:
-            e = to_legacy_error(e, None)
-            e = ConfitValidationError(
-                [
-                    ErrorWrapper(
-                        exc=TypeError(f"Expected {cls}, got {Draft[actual]}"),
-                        loc=e.raw_errors[0]._loc,
-                    ),
-                ],
-                model=cls,
+            raise ConfitValidationError.from_exception(
+                TypeError(f"Expected {cls}, got {Draft[actual]}"),
+                source=cls,
                 name=cls.__name__,
-            )
-            raise e
+            ).with_path(e.errors()[0]["loc"])
         return value
-
-    def __get_validators__(cls):
-        yield cls.validate
 
     def __get_pydantic_core_schema__(cls, source, handler):
         return core_schema.no_info_plain_validator_function(cls.validate)
@@ -183,11 +158,7 @@ class Draft(Generic[R], metaclass=MetaDraft):
         try:
             res = self._func(**{**kwargs, **self._kwargs})
         except ConfitValidationError as e:
-            raise ConfitValidationError(
-                patch_errors(e.raw_errors, self._loc, self._kwargs),
-                model=e.model,
-                name=getattr(e, "name", None),
-            ).with_traceback(e.__traceback__)
+            raise e.with_path(self._loc).with_traceback(e.__traceback__)
         return res
 
     def _raise_draft_error(self):

@@ -14,7 +14,7 @@ dynamic = ['version']
 dependencies = [
     "catalogue>=2.0.7",
     "lark>=1.1.5",
-    "pydantic>=1.2",
+    "pydantic>=2.1.1,<3",
     "pydantic-core>=0.20",
     "PyYAML",
     "griffe",

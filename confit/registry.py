@@ -1,6 +1,7 @@
+import importlib.metadata as importlib_metadata
 import inspect
 import warnings
-from functools import wraps
+from functools import WRAPPER_ASSIGNMENTS, wraps
 from typing import (
     Any,
     Callable,
@@ -14,150 +15,156 @@ from typing import (
 )
 
 import catalogue
-import pydantic
-from pydantic import ValidationError
+from pydantic import ValidationError, validate_call
+from pydantic.fields import FieldInfo
 from typing_extensions import ParamSpec
 
 from confit.config import Config
 from confit.draft import Draft, Draftable
 from confit.errors import (
     ConfitValidationError,
-    LegacyValidationError,
-    PydanticErrorMixin,
     SignatureError,
-    convert_type_error,
-    patch_errors,
     remove_lib_from_traceback,
-    to_legacy_error,
 )
 from confit.utils.settings import is_debug
 
-try:
-    from pydantic.decorator import ValidatedFunction
-except ImportError:
-    from pydantic.deprecated.decorator import ValidatedFunction
-
-if pydantic.VERSION >= "2":
-    pass
-
-try:
-    import importlib.metadata as importlib_metadata
-except ImportError:  # pragma: no cover
-    import importlib_metadata
-
-PYDANTIC_V1 = pydantic.VERSION.split(".")[0] == "1"
+# Reuse evaluated annotations, evaluating AsList[int] again can create a different class
+WRAPPER_ATTRIBUTES = WRAPPER_ASSIGNMENTS + (
+    "__annotations__",
+    "__defaults__",
+    "__kwdefaults__",
+)
 
 
-def _resolve_and_validate_call(
-    args: Sequence[Any],
-    kwargs: Dict[str, Any],
-    pydantic_func: ValidatedFunction,
-    use_self: bool,
-    callee: Callable,
-    invoker: Optional[Callable[[Callable, Dict[str, Any]], Any]],
-) -> Any:
-    returned = None
-    resolved = None
-    extras_name = pydantic_func.v_kwargs_name
+def make_wrapper(raw_function, callee, config, invoker):
+    """
+    Prepare validation once, then resolve and execute each registered call
+    """
+    is_class = isinstance(callee, type)
+    target = inspect.unwrap(raw_function) if is_class else raw_function
+    signature = inspect.signature(target)
+    parameters = signature.parameters
+    self_name = next(iter(parameters)) if is_class else None
+    extras_name = next(
+        (name for name, p in parameters.items() if p.kind == p.VAR_KEYWORD), None
+    )
+    callee_name = callee.__module__ + "." + callee.__qualname__
+    # Keep Field defaults, ordinary defaults stay omitted through stacked decorators
+    omitted_defaults = {
+        name
+        for name, p in parameters.items()
+        if p.default is not inspect.Parameter.empty
+        and not isinstance(p.default, FieldInfo)
+    }
 
-    # Call the pydantic model with the values
-    # If an invoker was provided, use it to invoke the function
-    # to allow the user to update the values before calling the function
-    # and/or do something with the result
-    def invoked(kw):
-        nonlocal returned, resolved
-        # "self" must be passed as a positional argument
-        if use_self:
-            kw = {**kw, self_name: resolved}
-        fields = (
-            pydantic_func.model.__fields__
-            if PYDANTIC_V1
-            else pydantic_func.model.model_fields
-        )
-        extras = [key for key in kw if key not in fields and key != extras_name]
+    @wraps(target, assigned=WRAPPER_ATTRIBUTES)
+    def collect(*args, **kwargs):
+        return args, kwargs
+
+    validator = validate_call(collect, config=config)
+
+    @wraps(raw_function, assigned=WRAPPER_ATTRIBUTES)
+    def wrapper(*args, **kwargs):
         try:
-            model_instance = pydantic_func.model(
-                **{
-                    **{k: v for k, v in kw.items() if k not in extras},
-                    **({extras_name: {k: kw[k] for k in extras}} if extras else {}),
+            extras = {
+                k: v
+                for k, v in kwargs.items()
+                if k not in parameters and extras_name is None
+            }
+            try:
+                bound = signature.bind_partial(
+                    *args, **{k: v for k, v in kwargs.items() if k not in extras}
+                )
+            except TypeError as error:
+                error = TypeError(
+                    str(error).replace(
+                        "multiple values for argument ",
+                        "multiple values for argument: ",
+                    )
+                )
+                raise ConfitValidationError(
+                    [
+                        {
+                            "loc": ("[signature]",),
+                            "msg": str(error),
+                            "type": "arguments_error",
+                        }
+                    ],
+                    source=callee,
+                    name=callee_name,
+                ) from None
+            values = dict(bound.arguments)
+            if extras_name in values:
+                values.update(values.pop(extras_name))
+            values.update(extras)
+            resolved = values.pop(self_name) if self_name is not None else None
+            returned = None
+
+            def invoked(kw):
+                nonlocal returned, resolved
+                if self_name is not None:
+                    kw = {self_name: resolved, **kw}
+                bound = signature.bind_partial()
+                bound.arguments.update(
+                    {
+                        name: kw[name]
+                        for name in parameters
+                        if name in kw and name != extras_name
+                    }
+                )
+                extras = {
+                    k: v
+                    for k, v in kw.items()
+                    if k not in parameters or k == extras_name
                 }
-            )
-        except TypeError as type_error:
-            raise convert_type_error(type_error, pydantic_func, callee)
-        returned = pydantic_func.execute(model_instance)
-        if not use_self:
-            resolved = returned
-        return resolved
+                if extras and extras_name is None:
+                    raise ConfitValidationError(
+                        [
+                            {
+                                "loc": (name,),
+                                "msg": "unexpected keyword argument",
+                                "type": "unexpected_keyword_argument",
+                            }
+                            for name in extras
+                        ],
+                        source=callee,
+                        name=callee_name,
+                    )
+                try:
+                    validated_args, validated_kwargs = validator(
+                        *bound.args, **bound.kwargs, **extras
+                    )
+                except (ValidationError, ConfitValidationError) as error:
+                    raise ConfitValidationError.from_exception(
+                        error,
+                        source=callee,
+                        name=callee_name,
+                        signature=signature,
+                    ) from None
+                # Let the function supply its ordinary defaults
+                call = signature.bind_partial(*validated_args, **validated_kwargs)
+                for name in omitted_defaults - bound.arguments.keys():
+                    call.arguments.pop(name, None)
+                returned = raw_function(*call.args, **call.kwargs)
+                if self_name is None:
+                    resolved = returned
+                return resolved
 
-    values = None
+            if invoker is None:
+                invoked(values)
+            else:
+                invoker(invoked, values)
+            return returned
+        except Exception as error:
+            context = error.__context__ if is_class else error.__cause__
+            if not is_debug() and isinstance(
+                context, (ValidationError, ConfitValidationError)
+            ):
+                error.__cause__ = None
+                error.__suppress_context__ = True
+            raise error.with_traceback(remove_lib_from_traceback(error.__traceback__))
 
-    try:
-        values = pydantic_func.build_values(args, kwargs)
-        if extras_name in values:
-            values.update(values.pop(extras_name))
-
-        if use_self:
-            self_name = pydantic_func.arg_mapping[0]
-            resolved = values.pop(self_name)
-
-        if invoker is not None:
-            invoker(invoked, values)
-        else:
-            invoked(values)
-    except (ValidationError, LegacyValidationError) as e:
-        e = to_legacy_error(e, pydantic_func.model)
-        flat_errors = e.raw_errors
-        name = None
-        if e.model is pydantic_func.model:
-            name = callee.__module__ + "." + callee.__qualname__
-            flat_errors = patch_errors(
-                errors=flat_errors,
-                path=(),
-                values=values,
-                model=pydantic_func.model,
-                special_names=(
-                    pydantic_func.v_args_name,
-                    pydantic_func.v_kwargs_name,
-                    "v__duplicate_kwargs",
-                    "v__positional_only",
-                    "v__args",
-                    "v__kwargs",
-                ),
-            )
-        non_valid_errors = [
-            e
-            for e in flat_errors
-            if not isinstance(e.exc, (PydanticErrorMixin, TypeError))
-        ]
-        if name is None and hasattr(e.model, "type_"):
-            name = e.model.type_.__module__ + "." + e.model.type_.__qualname__
-        e = ConfitValidationError(
-            flat_errors,
-            model=e.model,
-            name=name,
-        )
-        if non_valid_errors:
-            raise e from non_valid_errors[0].exc
-        if not is_debug():
-            e.__cause__ = None
-            e.__suppress_context__ = True
-        raise e
-
-    return returned
-
-
-def _check_signature_for_save_params(func: Callable):
-    """
-    Checks that a function does not expect positional only arguments
-    since these are not serializable using a nested dict data structure
-    """
-    spec = inspect.signature(func)
-    if any(
-        param.kind
-        not in (param.POSITIONAL_OR_KEYWORD, param.VAR_KEYWORD, param.KEYWORD_ONLY)
-        for param in spec.parameters.values()
-    ):
-        raise SignatureError(func)
+    return wrapper
 
 
 P = ParamSpec("P")
@@ -191,8 +198,7 @@ def validate_arguments(
     registry: Any = None,
 ) -> Callable[[Callable[P, R]], Draftable[P, R]]:
     """
-    Decorator to validate the arguments passed to a function and store the result
-    in a mapping from results to call parameters (allowing
+    Validate function or constructor arguments and support deferred calls with draft
 
     Parameters
     ----------
@@ -209,65 +215,23 @@ def validate_arguments(
     -------
     Callable[[Callable[P, R]], Draftable[P, R]]:
     """
-    if config is None:
-        config = {}
-    config = {**config, "arbitrary_types_allowed": True}
+    config = {**(config or {}), "arbitrary_types_allowed": True}
 
     def validate(_func: Callable) -> Callable:
-        if isinstance(_func, type):
-            _func: type
-            vd = _func.__init__
-            while hasattr(vd, "__wrapped__"):
-                vd = vd.__wrapped__
-            vd = ValidatedFunction(vd, config)
-            vd.model.__name__ = _func.__name__
-            vd.raw_function = _func.__init__
-            if PYDANTIC_V1:
-                vd.model.__fields__["self"].default = None
-            else:
-                vd.model.model_fields["self"].default = None
+        is_class = isinstance(_func, type)
+        raw_function = _func.__init__ if is_class else _func
+        wrapper = make_wrapper(raw_function, _func, config, invoker)
+        draft_type = Draft[_func] if is_class else Draft
 
-            # This function is called by Pydantic when asked to cast
-            # a value (most likely a dict) as a Model (most often during
-            # a function call)
+        @wraps(raw_function, assigned=WRAPPER_ATTRIBUTES)
+        def draft(**kwargs):
+            return draft_type(_func, kwargs)
 
-            old_get_validators = (
-                _func.__get_validators__
-                if hasattr(_func, "__get_validators__")
-                else None
+        if is_class:
+            old_get_validators = getattr(_func, "__get_validators__", None)
+            old_get_pydantic_core_schema = getattr(
+                _func, "__get_pydantic_core_schema__", None
             )
-            old_get_pydantic_core_schema = (
-                _func.__get_pydantic_core_schema__
-                if hasattr(_func, "__get_pydantic_core_schema__")
-                else None
-            )
-
-            def __get_validators__():
-                """
-                This function is called by Pydantic when asked to cast
-                a value (most likely a dict) as a Model (most often during
-                a function call)
-
-                Yields
-                -------
-                Callable
-                    The validator function
-                """
-
-                def _validate(value):
-                    if isinstance(value, dict):
-                        value = Config(value).resolve(registry=registry)
-
-                    if old_get_validators is not None:
-                        for validator in old_get_validators():
-                            value = validator(value)
-
-                    if isinstance(value, _func):
-                        return value
-
-                    return _func(**value)
-
-                yield _validate
 
             def __get_pydantic_core_schema__(*args, **kwargs):
                 from pydantic_core import core_schema
@@ -283,141 +247,26 @@ def validate_arguments(
 
                     return _func(**value)
 
-                return core_schema.chain_schema(
-                    [
-                        core_schema.no_info_plain_validator_function(pre_validate),
-                        *(
-                            (old_get_pydantic_core_schema(*args, **kwargs),)
-                            if old_get_pydantic_core_schema
-                            else (
-                                core_schema.no_info_plain_validator_function(fn)
-                                for fn in old_get_validators()
-                            )
-                            if old_get_validators is not None
-                            else ()
-                        ),
-                        core_schema.no_info_plain_validator_function(post_validate),
-                    ]
+                steps = [core_schema.no_info_plain_validator_function(pre_validate)]
+                if old_get_pydantic_core_schema is not None:
+                    steps.append(old_get_pydantic_core_schema(*args, **kwargs))
+                elif old_get_validators is not None:
+                    steps.extend(
+                        core_schema.no_info_plain_validator_function(fn)
+                        for fn in old_get_validators()
+                    )
+                steps.append(
+                    core_schema.no_info_plain_validator_function(post_validate)
                 )
+                return core_schema.chain_schema(steps)
 
-            # This function is called when we do Model(variable=..., other=...)
-            @wraps(
-                vd.raw_function,
-                assigned=(
-                    "__module__",
-                    "__name__",
-                    "__qualname__",
-                    "__doc__",
-                    "__annotations__",
-                    "__defaults__",
-                    "__kwdefaults__",
-                ),
-            )
-            def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                try:
-                    return _resolve_and_validate_call(
-                        args=args,
-                        kwargs=kwargs,
-                        pydantic_func=vd,
-                        use_self=True,
-                        invoker=invoker,
-                        callee=_func,
-                    )
-                except Exception as e:
-                    if not is_debug() and isinstance(
-                        e.__context__, (ValidationError, LegacyValidationError)
-                    ):
-                        e.__cause__ = None
-                        e.__suppress_context__ = True
-                    raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
+            _func.__get_pydantic_core_schema__ = __get_pydantic_core_schema__
+            _func.__init__ = wrapper
+        result = _func if is_class else wrapper
+        result.draft = draft
+        return result
 
-            @wraps(
-                vd.raw_function,
-                assigned=(
-                    "__module__",
-                    "__name__",
-                    "__qualname__",
-                    "__doc__",
-                    "__annotations__",
-                    "__defaults__",
-                    "__kwdefaults__",
-                ),
-            )
-            def draft(**kwargs):
-                return Draft[_func](_func, kwargs)
-
-            _func.vd = vd
-            if PYDANTIC_V1:
-                _func.__get_validators__ = __get_validators__
-            else:
-                _func.__get_pydantic_core_schema__ = __get_pydantic_core_schema__
-            # _func.model = vd.model
-            # _func.model.type_ = _func
-            _func.__init__ = wrapper_function
-            _func.__init__.__wrapped__ = vd.raw_function
-            _func.draft = draft
-            return _func
-
-        else:
-            vd = ValidatedFunction(_func, config)
-
-            @wraps(
-                _func,
-                assigned=(
-                    "__module__",
-                    "__name__",
-                    "__qualname__",
-                    "__doc__",
-                    "__annotations__",
-                    "__defaults__",
-                    "__kwdefaults__",
-                    "__signature__",
-                ),
-            )
-            def wrapper_function(*args: Any, **kwargs: Any) -> Any:
-                try:
-                    return _resolve_and_validate_call(
-                        args=args,
-                        kwargs=kwargs,
-                        pydantic_func=vd,
-                        use_self=False,
-                        invoker=invoker,
-                        callee=_func,
-                    )
-                except Exception as e:
-                    if not is_debug() and isinstance(
-                        e.__cause__, (ValidationError, LegacyValidationError)
-                    ):
-                        e.__cause__ = None
-                        e.__suppress_context__ = True
-                    raise e.with_traceback(remove_lib_from_traceback(e.__traceback__))
-
-            @wraps(
-                vd.raw_function,
-                assigned=(
-                    "__module__",
-                    "__name__",
-                    "__qualname__",
-                    "__doc__",
-                    "__annotations__",
-                    "__defaults__",
-                    "__kwdefaults__",
-                ),
-            )
-            def draft(**kwargs):
-                return Draft(_func, kwargs)
-
-            wrapper_function.vd = vd  # type: ignore
-            wrapper_function.validate = vd.init_model_instance  # type: ignore
-            wrapper_function.__wrapped__ = vd.raw_function  # type: ignore
-            wrapper_function.model = vd.model  # type: ignore
-            wrapper_function.draft = draft
-            return wrapper_function
-
-    if func:
-        return validate(func)
-    else:
-        return validate
+    return validate(func) if func is not None else validate
 
 
 class VisibleDeprecationWarning(UserWarning):
@@ -476,8 +325,8 @@ class Registry(catalogue.Registry):
         func:
             The function to register
         save_params:
-            Additional parameters to save when the function is called. If falsy,
-            the function parameters are not saved
+            Additional parameters to save with the call arguments, defaults to the
+            registry name when omitted or empty
         skip_save_params:
             List of parameters to skip when saving the function parameters
         invoker:
@@ -494,23 +343,23 @@ class Registry(catalogue.Registry):
 
         def invoke(func, params):
             resolved = invoker(func, params) if invoker is not None else func(params)
-            if save_params is not None:
-                params_to_save = {**save_params, **params}
-                for name in skip_save_params:
-                    params_to_save.pop(name, None)
-                Config._store_resolved(resolved, params_to_save)
+            params_to_save = {**save_params, **params}
+            for name in skip_save_params:
+                params_to_save.pop(name, None)
+            Config._store_resolved(resolved, params_to_save)
             return resolved
 
         def wrap_and_register(fn: Callable[P, R]) -> Draftable[P, R]:
-            if save_params is not None:
-                _check_signature_for_save_params(
-                    fn if not isinstance(fn, type) else fn.__init__
-                )
+            signature = inspect.signature(fn.__init__ if isinstance(fn, type) else fn)
+            if any(
+                p.kind in (p.POSITIONAL_ONLY, p.VAR_POSITIONAL)
+                for p in signature.parameters.values()
+            ):
+                raise SignatureError(fn)
 
             validated_fn = validate_arguments(
                 fn,
-                config={"arbitrary_types_allowed": True},
-                registry=getattr(self, "registry", None),
+                registry=self.registry,
                 invoker=invoke,
             )
 
@@ -519,7 +368,7 @@ class Registry(catalogue.Registry):
             for deprecated_name in deprecated:
 
                 def make_deprecated_fn(old):
-                    @wraps(fn)
+                    @wraps(fn, assigned=WRAPPER_ATTRIBUTES)
                     def deprecated_fn(*args, **kwargs):
                         warnings.warn(
                             f'"{old}" is deprecated, please use "{name}" instead."',
@@ -543,11 +392,7 @@ class Registry(catalogue.Registry):
 
         RETURNS (Dict[str, Any]): Entry points, keyed by name.
         """
-        entrypoints = importlib_metadata.entry_points()
-        if hasattr(entrypoints, "select"):
-            return entrypoints.select(group=self.entry_point_namespace)
-        else:  # dict
-            return entrypoints.get(self.entry_point_namespace, [])
+        return importlib_metadata.entry_points(group=self.entry_point_namespace)
 
     def get(self, name: str):
         """
@@ -673,3 +518,17 @@ def set_default_registry(registry: CustomRegistry) -> CustomRegistry:
     global _default_registry
     _default_registry = registry
     return registry
+
+
+def __getattr__(name):
+    # Older EDS-NLP converters import the Pydantic validator through Confit
+    if name == "ValidatedFunction":
+        warnings.warn(
+            "ValidatedFunction is deprecated, use pydantic.validate_call",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from pydantic.deprecated.decorator import ValidatedFunction
+
+        return ValidatedFunction
+    raise AttributeError(name)

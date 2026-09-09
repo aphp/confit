@@ -210,3 +210,24 @@ python script.py training run --config config.yml --epochs 20
 
 Omit `name` to expose the child commands directly on the parent. Configuration
 sections continue to use the leaf command name, such as `run` in this example.
+
+## Validation errors
+
+Confit adds configuration and component paths to validation errors. Use
+`ConfitValidationError` to preserve that context when validating nested objects.
+
+```python
+from confit.errors import ConfitValidationError
+from pydantic import TypeAdapter, ValidationError
+
+try:
+    TypeAdapter(int).validate_python("invalid")
+except ValidationError as exc:
+    error = ConfitValidationError.from_exception(exc, name="Encoder")
+    error = error.with_path(("components", "encoder", "width"))
+    print(error)
+```
+
+Catch `ConfitValidationError` for validation failures. Use `with_path` to add
+context without changing the original error, `combine` to collect failures,
+and `errors()` to access structured details.

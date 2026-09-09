@@ -3,13 +3,12 @@ import functools
 import os
 
 import pytest
-from pydantic import StrictBool
+from pydantic import Field, StrictBool, TypeAdapter, ValidationError
 from typing_extensions import Literal
 
 from confit import Config, Registry, Validatable
 from confit.errors import ConfitValidationError
 from confit.registry import (
-    PYDANTIC_V1,
     RegistryCollection,
     SignatureError,
     VisibleDeprecationWarning,
@@ -39,8 +38,7 @@ def test_fail_args():
 
         @registry.factory.register("bad-model")
         class BadModel:
-            def __init__(self, *args, value: float):
-                ...
+            def __init__(self, *args, value: float): ...
 
     assert "positional only args or duplicated kwargs" in str(e.value)
 
@@ -94,7 +92,6 @@ def test_custom_validators_v1():
     )
 
 
-@pytest.mark.xfail(PYDANTIC_V1, reason="API not compatible with Pydantic v1")
 def test_custom_validators_v2():
     @validate_arguments()
     class ModelWithCustomValidation:
@@ -161,18 +158,11 @@ def test_literals():
 
     with pytest.raises(ConfitValidationError) as e:
         test("not ok")
-    if PYDANTIC_V1:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_literals.<locals>.test()\n"
-            "-> val\n"
-            "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
-        )
-    else:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_literals.<locals>.test()\n"
-            "-> val\n"
-            "   input should be 'ok' or 'ko', got 'not ok' (str)"
-        )
+    assert str(e.value) == (
+        "1 validation error for test_validate.test_literals.<locals>.test()\n"
+        "-> val\n"
+        "   input should be 'ok' or 'ko', got 'not ok' (str)"
+    )
 
 
 def test_dates():
@@ -182,17 +172,10 @@ def test_dates():
 
     with pytest.raises(ConfitValidationError) as e:
         test("hello")
-    if PYDANTIC_V1:
-        assert str(e.value) == (
-            "1 validation error for test_validate.test_dates.<locals>.test()\n"
-            "-> val\n"
-            "   invalid datetime format, got 'hello' (str)"
-        )
-    else:
-        err = str(e.value)
-        assert "1 validation error for test_validate.test_dates.<locals>.test()" in err
-        assert "-> val" in err
-        assert "input is too short, got 'hello'" in err
+    err = str(e.value)
+    assert "1 validation error for test_validate.test_dates.<locals>.test()" in err
+    assert "-> val" in err
+    assert "input is too short, got 'hello'" in err
 
 
 def test_fail_init():
@@ -202,6 +185,9 @@ def test_fail_init():
             self.desc = desc
             if raise_attribute:
                 raise AttributeError("some_attribute")
+
+        def __repr__(self):
+            return self.desc
 
     @validate_arguments()
     class Model:
@@ -221,33 +207,17 @@ def test_fail_init():
 
     with pytest.raises(ConfitValidationError) as e:
         Model(raise_attribute=False)
-    if PYDANTIC_V1:
-        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
-            "1 validation error for SubModel()\n"
-            "-> raise_attribute\n"
-            "   field required"
-        )
-    else:
-        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
-            "1 validation error for SubModel()\n"
-            "-> raise_attribute\n"
-            "   field required"
-        )
+    assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+        "1 validation error for SubModel()\n-> raise_attribute\n   field required"
+    )
 
     with pytest.raises(ConfitValidationError) as e:
         BigModel(model=dict(raise_attribute="ok"))
-    if PYDANTIC_V1:
-        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
-            "1 validation error for BigModel()\n"
-            "-> model.raise_attribute\n"
-            "   value is not a valid boolean, got 'ok' (str)"
-        )
-    else:
-        assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
-            "1 validation error for BigModel()\n"
-            "-> model.raise_attribute\n"
-            "   input should be a valid boolean, got 'ok' (str)"
-        )
+    assert str(e.value).replace("test_validate.test_fail_init.<locals>.", "") == (
+        "1 validation error for BigModel()\n"
+        "-> model.raise_attribute\n"
+        "   input should be a valid boolean, got 'ok' (str)"
+    )
     repr(e)
 
     with pytest.raises(ConfitValidationError) as e:
@@ -261,6 +231,11 @@ def test_fail_init():
         "      field required"
     )
 
+    # A partially initialized input must not hide its validation error
+    with pytest.raises(ConfitValidationError) as e:
+        Model(raise_attribute=SubModel.__new__(SubModel))
+    assert "input should be a valid boolean, got <" in str(e.value)
+
 
 def test_debug():
     try:
@@ -272,18 +247,11 @@ def test_debug():
 
         with pytest.raises(ConfitValidationError) as e:
             test("not ok")
-        if PYDANTIC_V1:
-            assert str(e.value) == (
-                "1 validation error for test_validate.test_debug.<locals>.test()\n"
-                "-> val\n"
-                "   unexpected value; permitted: 'ok', 'ko', got 'not ok' (str)"
-            )
-        else:
-            assert str(e.value) == (
-                "1 validation error for test_validate.test_debug.<locals>.test()\n"
-                "-> val\n"
-                "   input should be 'ok' or 'ko', got 'not ok' (str)"
-            )
+        assert str(e.value) == (
+            "1 validation error for test_validate.test_debug.<locals>.test()\n"
+            "-> val\n"
+            "   input should be 'ok' or 'ko', got 'not ok' (str)"
+        )
     finally:
         os.environ.pop("CONFIT_DEBUG", None)
 
@@ -315,28 +283,13 @@ def test_deep_extra():  # from pydantic import validate_arguments
     with pytest.raises(ConfitValidationError) as e:
         func(val={"c": 3, "d": 4})
 
-    if PYDANTIC_V1:
-        assert str(e.value) == (
-            "4 validation errors for test_validate.test_deep_extra.<locals>.func()\n"
-            "-> val.a\n"
-            "   field required\n"
-            "-> val.b\n"
-            "   field required\n"
-            "-> val.c\n"
-            "   unexpected keyword argument\n"
-            "-> val.d\n"
-            "   unexpected keyword argument"
-        )
-    else:
-        # For some reason, pydantic v2 models abort the validation in case of
-        # unexpected fields, so we only get 2 errors instead of 4
-        assert str(e.value) == (
-            "2 validation errors for test_validate.test_deep_extra.<locals>.func()\n"
-            "-> val.c\n"
-            "   unexpected keyword argument\n"
-            "-> val.d\n"
-            "   unexpected keyword argument"
-        )
+    assert str(e.value) == (
+        "2 validation errors for test_validate.test_deep_extra.<locals>.func()\n"
+        "-> val.c\n"
+        "   unexpected keyword argument\n"
+        "-> val.d\n"
+        "   unexpected keyword argument"
+    )
 
 
 def test_duplicated_arg():
@@ -394,11 +347,22 @@ def test_clean_error():
 
     try:
         func(submodel=dict(value="hi", card="hello"))
-    except Exception as e:
+    except ConfitValidationError as e:
+        detail = e.errors()[0]
+        assert detail["loc"] == ("submodel",)
+        assert isinstance(detail["ctx"]["error"], ConfitValidationError)
+        assert detail["ctx"]["error"].errors()[0]["loc"] == ("card",)
+        assert "inner_get_card_length()" in str(e)
         assert e.__cause__ is None
         assert e.__suppress_context__ is True
     else:
         assert False, "Should have raised ConfitValidationError"
+
+    with pytest.raises(ValidationError) as e:
+        TypeAdapter(list[SubModel]).validate_python([{"value": "hi"}])
+    error = ConfitValidationError.from_exception(e.value)
+    assert error.errors()[0]["loc"] == (0,)
+    assert "SubModel()" in str(error)
 
 
 def test_dump_kwargs():
@@ -438,8 +402,8 @@ def test_deprecated():
 
 def test_wrapped_init():
     value = 5
-    def decorator(func):
 
+    def decorator(func):
         @functools.wraps(func)
         def wrapped(self, *args, **kwargs):
             nonlocal value
@@ -449,11 +413,60 @@ def test_wrapped_init():
         return wrapped
 
     @validate_arguments()
+    @validate_arguments()
     class MyClass:
         @decorator
-        def __init__(self, value: int):
+        def __init__(self, value: int, desc: str = None):
             self.value = value
 
     obj = MyClass(10)
     assert obj.value == 10
     assert value == 6  # 5 + 1 from the decorator
+
+
+def test_schema_argument():
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+
+        @validate_arguments
+        def export(schema: int = Field(default=1), *, model_dump: int = 0):
+            return schema + model_dump
+
+        @validate_arguments
+        class Writer:
+            def __init__(self, schema: int = Field(default_factory=lambda: 1)):
+                self.schema = schema
+
+        assert export() == Writer().schema == 1
+        assert export("2") == export(schema="2") == Writer(schema="2").schema == 2
+        assert export(schema="2", model_dump="3") == 5
+        for target in (export, Writer):
+            with pytest.raises(ConfitValidationError, match="-> schema\n"):
+                target(schema="invalid")
+
+
+def test_legacy_errors():
+    from confit.errors import patch_errors
+
+    with pytest.raises(ValidationError) as caught:
+        TypeAdapter(int).validate_python("bad")
+    with pytest.warns(DeprecationWarning):
+        error = patch_errors(caught.value, model=int, drop_names=("__root__",))
+        error = patch_errors(error, model=int)
+        error.model = int
+        combined = ConfitValidationError([error.raw_errors], model=error.model)
+        combined.raw_errors = patch_errors(combined.raw_errors, ("component",))
+    assert combined.errors()[0]["loc"] == ("component",)
+    assert combined.source is int
+    assert "got 'bad' (str)" in str(combined)
+
+    with pytest.warns(DeprecationWarning):
+        from confit.registry import ValidatedFunction
+
+    def converter(value: int):
+        return value
+
+    validator = ValidatedFunction(converter, {})
+    assert validator.init_model_instance(value="2").value == 2

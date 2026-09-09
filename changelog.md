@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fix nested validation error paths on Python 3.14
+- Move to Pydantic v2, requiring version 2.1.1 or later
+- Remove Pydantic v1 internals and wrapper attributes `.model`, `.vd` and `.validate`, keeping deprecated entry points needed by existing EDS-NLP clients
+- Support parameter names such as `schema` without conflicts with model methods, using `validate_call` under the hood
+
 ## v0.12.0 (2026-08-11)
 
 - Restore nested CLI applications with `Cli.add_subcommands()`. Confit CLI objects

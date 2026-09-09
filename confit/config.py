@@ -15,7 +15,6 @@ from confit.errors import (
     ConfitValidationError,
     CyclicReferenceError,
     MissingReference,
-    patch_errors,
     remove_lib_from_traceback,
 )
 from confit.utils.collections import flatten_sections, join_path, split_path
@@ -118,12 +117,8 @@ class Config(dict):
                     current = current[part]
 
             current.clear()
-            errors = []
             for k, v in parser.items(section):
                 current[loads(k)] = loads(v)
-
-            if errors:
-                raise ConfitValidationError(errors=errors)
 
         if resolve:
             return config.resolve(registry=registry)
@@ -464,11 +459,9 @@ class Config(dict):
                         # we need to do it here
                         Config._store_resolved(resolved, cfg)
                     except ConfitValidationError as e:
-                        e = ConfitValidationError(
-                            errors=patch_errors(e.raw_errors, loc, params),
-                            model=e.model,
-                            name=getattr(e, "name", None),
-                        ).with_traceback(remove_lib_from_traceback(e.__traceback__))
+                        e = e.with_path(loc).with_traceback(
+                            remove_lib_from_traceback(e.__traceback__)
+                        )
                         if not is_debug():
                             e.__cause__ = None
                             e.__suppress_context__ = True

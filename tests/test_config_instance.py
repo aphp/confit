@@ -5,7 +5,7 @@ import pytest
 from confit import Config, Registry, validate_arguments
 from confit.config import CyclicReferenceError, MissingReference, Reference
 from confit.errors import ConfitValidationError
-from confit.registry import PYDANTIC_V1, RegistryCollection
+from confit.registry import RegistryCollection
 from confit.utils.xjson import dumps, loads
 
 
@@ -368,23 +368,26 @@ def test_type_hinted_instantiation_error():
     )
     with pytest.raises(ConfitValidationError) as exc_info:
         function(**params)
-    if PYDANTIC_V1:
-        assert str(exc_info.value) == (
-            "1 validation error for "
-            "test_config_instance.test_type_hinted_instantiation_error.<locals>"
-            ".function()\n"
-            "-> embedding.value\n"
-            "   value is not a valid float, got 'ok' (str)"
-        )
-    else:
-        assert str(exc_info.value) == (
-            "1 validation error for "
-            "test_config_instance.test_type_hinted_instantiation_error.<locals>"
-            ".function()\n"
-            "-> embedding.value\n"
-            "   input should be a valid number, unable to parse string as a number, "
-            "got 'ok' (str)"
-        )
+    assert str(exc_info.value) == (
+        "1 validation error for "
+        "test_config_instance.test_type_hinted_instantiation_error.<locals>"
+        ".function()\n"
+        "-> embedding.value\n"
+        "   input should be a valid number, unable to parse string as a number, "
+        "got 'ok' (str)"
+    )
+
+    error = exc_info.value
+    first = error.with_path(("first",))
+    second = error.with_path(("second",))
+    combined = ConfitValidationError.combine([first, second])
+    assert [detail["loc"] for detail in combined.errors()] == [
+        ("first", "embedding", "value"),
+        ("second", "embedding", "value"),
+    ]
+    assert error.errors()[0]["loc"] == ("embedding", "value")
+    assert error.errors()[0]["type"] == "float_parsing"
+    assert error.errors()[0]["input"] == "ok"
 
 
 def test_factory_instantiation_error():
@@ -396,19 +399,12 @@ def test_factory_instantiation_error():
         value = "ok"
         """
         ).resolve(registry=registry)
-    if PYDANTIC_V1:
-        assert str(exc_info.value) == (
-            "1 validation error for test_config_instance.SubModel()\n"
-            "-> embedding.value\n"
-            "   value is not a valid float, got 'ok' (str)"
-        )
-    else:
-        assert str(exc_info.value) == (
-            "1 validation error for test_config_instance.SubModel()\n"
-            "-> embedding.value\n"
-            "   input should be a valid number, unable to parse string as a number, got"
-            " 'ok' (str)"
-        )
+    assert str(exc_info.value) == (
+        "1 validation error for test_config_instance.SubModel()\n"
+        "-> embedding.value\n"
+        "   input should be a valid number, unable to parse string as a number, got"
+        " 'ok' (str)"
+    )
 
 
 def test_absolute_dump_path():

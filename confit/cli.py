@@ -18,8 +18,10 @@ from typing import (
     get_origin,
 )
 
+from pydantic.fields import FieldInfo
+
 from .config import Config, merge_from_disk
-from .errors import ConfitValidationError, LegacyValidationError, patch_errors
+from .errors import ConfitValidationError
 from .registry import VisibleDeprecationWarning, validate_arguments
 from .utils.random import set_seed
 from .utils.settings import is_debug
@@ -370,19 +372,13 @@ class Cli:
         if default_config is not None and merge_with_default_config:
             config = Config(default_config).merge(config)
 
-        # model_fields tells whether dotted overrides start at the command section.
-        # For example model.date becomes script.model.date when model is a parameter.
-        model_fields = (
-            validated.model.model_fields
-            if hasattr(validated.model, "model_fields")
-            else validated.model.__fields__
-        )
+        parameters = inspect.signature(fn).parameters
         for key, value in parse_overrides(overrides).items():
             if "." not in key:
                 parts = (name, key)
             else:
                 parts = key.split(".")
-                if parts[0] in model_fields and parts[0] not in config:
+                if parts[0] in parameters and parts[0] not in config:
                     parts = (name, *parts)
             current = config
             if parts[0] not in current:
@@ -392,9 +388,11 @@ class Cli:
             current[parts[-1]] = value
 
         try:
-            default_seed = model_fields.get("seed")
-            if default_seed is not None:
+            default_seed = parameters["seed"].default if "seed" in parameters else None
+            if isinstance(default_seed, FieldInfo):
                 default_seed = default_seed.get_default()
+            elif default_seed is inspect.Parameter.empty:
+                default_seed = None
             seed = Config.resolve(
                 config.get(name, {}).get("seed", default_seed),
                 registry=registry,
@@ -414,8 +412,8 @@ class Cli:
                 )
                 return validated(**resolved_config, config_meta=config_meta)
             return validated(**resolved_config)
-        except (LegacyValidationError, ConfitValidationError) as e:
-            e.raw_errors = patch_errors(e.raw_errors, (name,))
+        except ConfitValidationError as e:
+            e = e.with_path((name,))
             if is_debug() or e.__cause__ is not None:
                 raise e
             print("Validation error:", str(e))

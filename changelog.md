@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0.dev0 (2026-09-09)
 
 - Fix nested validation error paths on Python 3.14
 - Move to Pydantic v2, requiring version 2.1.1 or later

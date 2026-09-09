@@ -6,8 +6,8 @@ confit/cli.py                   352      0 100.00%
 confit/config.py                321      8  97.51%   146, 152, 382, 427, 513, 554, 592, 643
 confit/draft.py                  63      0 100.00%
 confit/errors.py                114      0 100.00%
-confit/registry.py              184      4  97.83%   395, 421, 423, 430
-confit/typing.py                 23      0 100.00%
+confit/registry.py              185      4  97.84%   399, 425, 427, 434
+confit/typing.py                 29      0 100.00%
 confit/utils/__init__.py          0      0 100.00%
 confit/utils/collections.py      32      0 100.00%
 confit/utils/eval.py             15      0 100.00%
@@ -15,4 +15,4 @@ confit/utils/random.py           38      0 100.00%
 confit/utils/settings.py         11      2  81.82%   11-12
 confit/utils/xjson.py           120      0 100.00%
 ------------------------------------------------------------
-TOTAL                          1295     14  98.92%
+TOTAL                          1302     14  98.92%

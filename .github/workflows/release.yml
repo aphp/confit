@@ -67,6 +67,12 @@ jobs:
         git config user.name ${{ github.actor }}
         git config user.email ${{ github.actor }}@users.noreply.github.com
     - name: Build documentation
+      env:
+        PRERELEASE: ${{ github.event.release.prerelease }}
       run: |
         git fetch origin gh-pages
-        uv run mike deploy --push --alias-type=copy --update-aliases $GITHUB_REF_NAME latest
+        if [ "$PRERELEASE" = "true" ]; then
+          uv run mike deploy --push "$GITHUB_REF_NAME"
+        else
+          uv run mike deploy --push --alias-type=copy --update-aliases "$GITHUB_REF_NAME" latest
+        fi

@@ -19,7 +19,7 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
             const headRef = pr.head.ref;
-            const match = headRef.match(/^release\/v(\d+\.\d+\.\d+)$/);
+            const match = headRef.match(/^release\/v(\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?)$/);
             if (!match) {
               core.setFailed(`Unsupported release branch name: ${headRef}`);
               return;
@@ -27,6 +27,7 @@ jobs:
 
             const version = match[1];
             const tag = `v${version}`;
+            const prerelease = /(?:a|b|rc)\d+|\.dev\d+/.test(version);
             const body = pr.body || "";
             const startMarker = "<!-- release-message:start -->";
             const endMarker = "<!-- release-message:end -->";
@@ -72,7 +73,7 @@ jobs:
               body: releaseBody,
               target_commitish: targetCommitish,
               draft: false,
-              prerelease: false,
+              prerelease,
               generate_release_notes: false,
             };
 
@@ -84,7 +85,7 @@ jobs:
                 name: tag,
                 body: releaseBody,
                 draft: false,
-                prerelease: false,
+                prerelease,
               });
               return;
             }

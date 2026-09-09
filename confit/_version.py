@@ -36,10 +36,13 @@ def get_version(base_version: str = _BASE_VERSION) -> str:
     except (OSError, subprocess.CalledProcessError):
         tag = None
 
+    development_version = (
+        base_version if ".dev" in base_version else f"{base_version}.dev0"
+    )
     return (
         base_version
         if tag in {base_version, f"v{base_version}"}
-        else f"{base_version}.dev0+g{commit_hash}"
+        else f"{development_version}+g{commit_hash}"
     )
 
 

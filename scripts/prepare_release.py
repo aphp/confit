@@ -18,8 +18,9 @@ VERSION_FILE = ROOT / "confit" / "_version.py"
 RELEASE_MESSAGE_START = "<!-- release-message:start -->"
 RELEASE_MESSAGE_END = "<!-- release-message:end -->"
 VERSION_RE = re.compile(r'^_BASE_VERSION\s*=\s*"([^"]+)"\s*$', re.MULTILINE)
+RELEASE_VERSION_PATTERN = r"\d+\.\d+\.\d+(?:(?:a|b|rc)\d+)?(?:\.post\d+)?(?:\.dev\d+)?"
 CHANGELOG_VERSION_RE = re.compile(
-    r"^## v(\d+\.\d+\.\d+) \(\d{4}-\d{2}-\d{2}\)$", re.MULTILINE
+    rf"^## v({RELEASE_VERSION_PATTERN}) \(\d{{4}}-\d{{2}}-\d{{2}}\)$", re.MULTILINE
 )
 
 
@@ -64,15 +65,18 @@ def run(
 
 
 def normalize_version(version: str) -> str:
-    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    if not re.fullmatch(RELEASE_VERSION_PATTERN, version):
         raise ReleaseError(
-            f"Invalid version '{version}'. Expected a semantic version like 0.12.0."
+            f"Invalid version '{version}'. "
+            "Expected a Python release version like 0.12.0 or 0.13.0.dev0."
         )
     return version
 
 
 def bump_version(current: str, part: str) -> str:
-    major, minor, patch = [int(value) for value in current.split(".")]
+    major, minor, patch = map(
+        int, re.match(r"(\d+)\.(\d+)\.(\d+)", normalize_version(current)).groups()
+    )
     if part == "major":
         return f"{major + 1}.0.0"
     if part == "minor":
@@ -201,7 +205,11 @@ def replace_version_mentions(old_version: str, new_version: str) -> list[Path]:
     touched_files: list[Path] = []
     for path in files_with_version(old_version):
         content = path.read_text()
-        updated = content.replace(old_version, new_version)
+        updated = re.sub(
+            rf"(?<![0-9.]){re.escape(old_version)}(?![a-zA-Z0-9.+])",
+            new_version,
+            content,
+        )
         if updated != content:
             path.write_text(updated)
             touched_files.append(path)
@@ -385,7 +393,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "version",
         nargs="?",
-        help="Target version, for example 0.12.0",
+        help="Target version, for example 0.12.0 or 0.13.0.dev0",
     )
     parser.add_argument(
         "--bump",

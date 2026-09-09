@@ -60,6 +60,13 @@ def test_validate_decorator():
     validated = validate_arguments()(GoodModel)
     assert validated("3").value == 3
 
+    scope = {"validate_arguments": validate_arguments}
+    exec("@validate_arguments\ndef fn(value: int): return value", scope)
+    assert scope["fn"]("3") == 3
+    with pytest.raises(ConfitValidationError) as exc:
+        scope["fn"]("invalid")
+    assert str(exc.value).startswith("1 validation error for fn()\n-> value\n")
+
 
 def test_custom_validators_v1():
     @validate_arguments()
@@ -149,6 +156,43 @@ def test_custom_validators_validatable():
         )
         == "Custom validation done"
     )
+
+
+@pytest.mark.parametrize("base", [Validatable, object])
+def test_custom_validator_type_error(base):
+    error = TypeError("Invalid value")
+
+    @validate_arguments
+    class Model(base):
+        def __init__(self, value: int):
+            self.value = value
+
+        @classmethod
+        def __get_validators__(cls):
+            yield cls.validate
+
+        @classmethod
+        def validate(cls, value):
+            raise error
+
+    @validate_arguments
+    def fn(values: list[Model]):
+        raise error
+
+    with pytest.raises(ConfitValidationError) as exc:
+        fn([1])
+    assert exc.value.errors() == [
+        {
+            "loc": ("values", 0),
+            "msg": "Invalid value",
+            "type": "type_error",
+            "input": 1,
+            "ctx": {"error": error},
+        }
+    ]
+    with pytest.raises(TypeError) as exc:
+        fn([])
+    assert exc.value is error
 
 
 def test_literals():

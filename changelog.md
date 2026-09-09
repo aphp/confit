@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Support validated functions created with exec without a module name
+- Keep TypeError from legacy custom validators wrapped as validation errors
+
 ## v0.13.0.dev0 (2026-09-09)
 
 - Fix nested validation error paths on Python 3.14

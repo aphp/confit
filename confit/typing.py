@@ -4,10 +4,26 @@ from typing import TypeVar
 
 from pydantic import BaseModel
 from pydantic.type_adapter import ConfigDict, TypeAdapter
-from pydantic_core import core_schema
+from pydantic_core import PydanticCustomError, core_schema
 from typing_extensions import is_typeddict
 
 T = TypeVar("T")
+
+
+def legacy_validator_schema(validator):
+    """
+    Keep TypeError as a validation failure for custom get_validators hooks
+    """
+
+    def validate(value):
+        try:
+            return validator(value)
+        except TypeError as error:
+            raise PydanticCustomError(
+                "type_error", "{error}", {"error": error}
+            ) from error
+
+    return core_schema.no_info_plain_validator_function(validate)
 
 
 class Validatable:
@@ -18,10 +34,7 @@ class Validatable:
     @classmethod
     def __get_pydantic_core_schema__(cls, source, handler):
         return core_schema.chain_schema(
-            [
-                core_schema.no_info_plain_validator_function(v)
-                for v in cls.__get_validators__()
-            ]
+            [legacy_validator_schema(v) for v in cls.__get_validators__()]
         )
 
 

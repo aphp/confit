@@ -26,6 +26,7 @@ from confit.errors import (
     SignatureError,
     remove_lib_from_traceback,
 )
+from confit.typing import legacy_validator_schema
 from confit.utils.settings import is_debug
 
 # Reuse evaluated annotations, evaluating AsList[int] again can create a different class
@@ -48,7 +49,11 @@ def make_wrapper(raw_function, callee, config, invoker):
     extras_name = next(
         (name for name, p in parameters.items() if p.kind == p.VAR_KEYWORD), None
     )
-    callee_name = callee.__module__ + "." + callee.__qualname__
+    callee_name = (
+        f"{callee.__module__}.{callee.__qualname__}"
+        if callee.__module__
+        else callee.__qualname__
+    )
     # Keep Field defaults, ordinary defaults stay omitted through stacked decorators
     omitted_defaults = {
         name
@@ -252,8 +257,7 @@ def validate_arguments(
                     steps.append(old_get_pydantic_core_schema(*args, **kwargs))
                 elif old_get_validators is not None:
                     steps.extend(
-                        core_schema.no_info_plain_validator_function(fn)
-                        for fn in old_get_validators()
+                        legacy_validator_schema(fn) for fn in old_get_validators()
                     )
                 steps.append(
                     core_schema.no_info_plain_validator_function(post_validate)

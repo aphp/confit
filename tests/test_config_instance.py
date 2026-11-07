@@ -697,6 +697,23 @@ section:
     assert config["params"]["field"] == "value_suffix"
 
 
+def test_yaml_dotted_string_inside_interpolation():
+    config = Config.from_yaml_str(
+        """\
+params:
+    cache: ${section.output_dir + "/requests.sqlite"}
+    other: ${section.output_dir + '/a.b' + "section.output_dir" + "\\\\"}
+
+section:
+    output_dir: data/x
+"""
+    ).resolve()
+    assert config["params"] == {
+        "cache": "data/x/requests.sqlite",
+        "other": "data/x/a.bsection.output_dir\\",
+    }
+
+
 def test_yaml_subconfig_resolve_with_root():
     config = Config.from_yaml_str(
         """\

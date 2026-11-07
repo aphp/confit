@@ -32,6 +32,7 @@ ID = r"[^\d\W]\w*"
 UNQUOTED_ID = rf"(?<![\'\"\w]){ID}(?![\'\"\w])"
 PATH_PART = rf"(?:'{ID}(?:[.]{ID})+'|\"{ID}(?:[.]{ID})+\"|{UNQUOTED_ID})"
 PATH = rf"{UNQUOTED_ID}(?:[.]{PATH_PART})*"
+STRING = r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\""
 
 
 class DynamicLocals(UserDict):
@@ -364,19 +365,34 @@ class Config(dict):
         seen_locs = set()
 
         def resolve_reference(ref: Reference) -> Any:
-            pat = re.compile(PATH + ":?")
+            # Since a dotted name inside a string literal looks like a reference,
+            # we also match whole string literals and leave them untouched
+            pat = re.compile(rf"(?P<path>{PATH}:?)|{STRING}")
 
-            def replace(match: re.Match):
+            def get_parts(match: re.Match):
+                """
+                Split a matched reference into the path parts used as keys of
+                `local_names`, or return None when the match is a string literal,
+                an attribute after `:` or a python keyword
+                """
+                path = match.group("path")
+                if path is None:
+                    return None
                 start = match.start()
                 if start > 0 and ref.value[start - 1] == ":":
-                    return match.group()
-
-                path = match.group()
+                    return None
                 parts = split_path(path.rstrip(":"))
 
                 # Check if part is any special python keyword
                 if len(parts) == 1 and parts[0] in keyword.kwlist:
+                    return None
+                return parts
+
+            def replace(match: re.Match):
+                parts = get_parts(match)
+                if parts is None:
                     return match.group()
+                path = match.group()
                 try:
                     return local_names[parts] + ("." if path.endswith(":") else "")
                 except KeyError:
@@ -384,14 +400,9 @@ class Config(dict):
 
             local_names = {}
             for match in pat.finditer(ref.value):
-                start = match.start()
-                if start > 0 and ref.value[start - 1] == ":":
-                    continue
-                path = match.group()
-                parts = split_path(path.rstrip(":"))
-                if len(parts) == 1 and parts[0] in keyword.kwlist:
-                    continue
-                local_names.setdefault(parts, f"var_{len(local_names)}")
+                parts = get_parts(match)
+                if parts is not None:
+                    local_names.setdefault(parts, f"var_{len(local_names)}")
 
             local_leaves = DynamicLocals(local_names, root, resolved_locs, rec)
 

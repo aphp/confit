@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep string literals intact inside `${...}` references, so `${a.b + "/x.y"}` no longer turns `x.y` into a placeholder name
+
 ## v0.13.0.dev1 (2026-09-09)
 
 - Support validated functions created with exec without a module name

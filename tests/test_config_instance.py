@@ -556,6 +556,23 @@ def test_simple_dump():
     assert config.to_str() == '[section]\ndate = "2023-08-31"\n\n'
 
 
+def test_shared_list_item_dump():
+    shared = {"a": 1, "sub": {"x": 2}}
+    config = Config(
+        {"section": {"items": [shared, shared], "other": shared, "deep": shared["sub"]}}
+    )
+    assert config.to_str() == (
+        "[section]\n"
+        'items = [{"a": 1, "sub": {"x": 2}}, {"a": 1, "sub": {"x": 2}}]\n'
+        "other = ${section.items[0]}\n"
+        "deep = ${section.items[0]['sub']}\n\n"
+    )
+    resolved = Config.from_str(config.to_str()).resolve()["section"]
+    assert resolved["items"] == [shared, shared]
+    assert resolved["other"] is resolved["items"][0]
+    assert resolved["deep"] is resolved["items"][0]["sub"]
+
+
 def test_list_interpolation():
     config = Config.from_str(
         """

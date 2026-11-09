@@ -393,7 +393,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "version",
         nargs="?",
-        help="Target version, for example 0.12.0 or 0.13.0.dev1",
+        help="Target version, for example 0.12.0 or 0.13.0",
     )
     parser.add_argument(
         "--bump",

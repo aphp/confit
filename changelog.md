@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.13.0 (2026-11-09)
 
 - Keep string literals intact inside `${...}` references, so `${a.b + "/x.y"}` no longer turns `x.y` into a placeholder name
 - Make the deprecated `raw_errors` details hashable, so EDS-PDF 0.10 shows pipeline config errors again instead of failing with `TypeError: unhashable type: 'dict'`

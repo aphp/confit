@@ -71,6 +71,17 @@ def remove_lib_from_traceback(tb):
     return tb
 
 
+class RawError(dict):
+    """
+    Error detail returned by the deprecated `raw_errors`. Since EDS-PDF 0.10 and
+    older callers deduplicate these details with `dict.fromkeys`, we hash them by
+    their type, location and message
+    """
+
+    def __hash__(self):
+        return hash((self["type"], tuple(self["loc"]), self["msg"]))
+
+
 class ConfitValidationError(ValueError):
     """
     Structured validation errors with paths added by config and pipeline resolution
@@ -203,7 +214,7 @@ class ConfitValidationError(ValueError):
         warnings.warn(
             "Use errors() instead of raw_errors", DeprecationWarning, stacklevel=2
         )
-        return self.errors()
+        return [RawError(detail) for detail in self.details]
 
     @raw_errors.setter
     def raw_errors(self, errors):

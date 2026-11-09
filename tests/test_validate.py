@@ -506,6 +506,11 @@ def test_legacy_errors():
     assert combined.source is int
     assert "got 'bad' (str)" in str(combined)
 
+    # EDS-PDF 0.10 deduplicates errors collected from sibling components
+    with pytest.warns(DeprecationWarning):
+        errors = [*combined.raw_errors, *combined.raw_errors]
+    assert len(dict.fromkeys(errors)) == 1
+
     with pytest.warns(DeprecationWarning):
         from confit.registry import ValidatedFunction
 

@@ -209,7 +209,8 @@ class Config(dict):
 
         We try to preserve referential equalities between non dict/list/tuple
         objects by serializing subsequent references to the same object as references
-        to its first occurrence in the tree.
+        to its first occurrence in the tree. Since a reference from inside a list to
+        an item of that same list cannot be resolved, we write a copy instead.
 
         ```python
         a = A()  # serializable object
@@ -232,7 +233,25 @@ class Config(dict):
 
         def rec(o: Any, path: Loc = ()):
             if id(o) in refs:
-                return refs[id(o)]
+                target = refs[id(o)]
+                # Resolving `${l[0]}` from inside `l` resolves the whole list `l`
+                # while it is being built, so in this case we write a copy
+                in_same_list = any(
+                    isinstance(part, int) and path[:i] == target[:i]
+                    for i, part in enumerate(target)
+                )
+                if not in_same_list:
+                    # Since `a.0` is not a valid python expression, we write the
+                    # parts after the first list index as subscripts, e.g.
+                    # `${a.b[0]['c']}`
+                    idx = next(
+                        (i for i, part in enumerate(target) if isinstance(part, int)),
+                        len(target),
+                    )
+                    return Reference(
+                        join_path(target[:idx])
+                        + "".join(f"[{part!r}]" for part in target[idx:])
+                    )
             if is_simple(o):
                 return o
             if isinstance(o, collections.abc.Mapping):
@@ -248,13 +267,13 @@ class Config(dict):
                 serialized = {k: rec(v, (*path, k)) for k, v in items}
                 serialized = {k: serialized[k] for k in o.keys()}
                 mem.append(o)
-                refs[id(o)] = Reference(join_path(path))
+                refs.setdefault(id(o), path)
                 if isinstance(o, Config):
                     serialized = Config(serialized)
                 return serialized
             if isinstance(o, (list, tuple)):
                 mem.append(o)
-                refs[id(o)] = Reference(join_path(path))
+                refs.setdefault(id(o), path)
                 return type(o)(rec(v, (*path, i)) for i, v in enumerate(o))
             cfg = None
             try:
@@ -273,7 +292,7 @@ class Config(dict):
                 pass
             if cfg is not None:
                 mem.append(o)
-                refs[id(o)] = Reference(join_path(path))
+                refs.setdefault(id(o), path)
                 return rec(cfg, path)
             try:
                 return pydantic_core.to_jsonable_python(o)

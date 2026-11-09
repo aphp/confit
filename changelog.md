@@ -5,6 +5,7 @@
 - Keep string literals intact inside `${...}` references, so `${a.b + "/x.y"}` no longer turns `x.y` into a placeholder name
 - Make the deprecated `raw_errors` details hashable, so EDS-PDF 0.10 shows pipeline config errors again instead of failing with `TypeError: unhashable type: 'dict'`
 - Save a config whose list holds the same object twice so that it loads again, by writing the second item as a copy and references to list items from other keys as `${a.b[0]}` instead of `${a.b.0}`
+- Accept registered classes that keep `object.__init__`, which used to fail with `SignatureError`, and reject their unexpected arguments with a validation error
 
 ## v0.13.0.dev1 (2026-09-09)
 

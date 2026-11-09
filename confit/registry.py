@@ -225,6 +225,12 @@ def validate_arguments(
     def validate(_func: Callable) -> Callable:
         is_class = isinstance(_func, type)
         raw_function = _func.__init__ if is_class else _func
+        if raw_function is object.__init__:
+            # Since `object.__init__` has no named parameters to validate, we
+            # validate against an empty constructor to reject unexpected arguments
+            def raw_function(self):
+                pass
+
         wrapper = make_wrapper(raw_function, _func, config, invoker)
         draft_type = Draft[_func] if is_class else Draft
 
@@ -354,10 +360,12 @@ class Registry(catalogue.Registry):
             return resolved
 
         def wrap_and_register(fn: Callable[P, R]) -> Draftable[P, R]:
-            signature = inspect.signature(fn.__init__ if isinstance(fn, type) else fn)
-            if any(
+            init = fn.__init__ if isinstance(fn, type) else fn
+            # A class that keeps `object.__init__` takes no arguments, so there is
+            # nothing to check
+            if init is not object.__init__ and any(
                 p.kind in (p.POSITIONAL_ONLY, p.VAR_POSITIONAL)
-                for p in signature.parameters.values()
+                for p in inspect.signature(init).parameters.values()
             ):
                 raise SignatureError(fn)
 

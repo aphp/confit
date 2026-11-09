@@ -5,6 +5,7 @@ import catalogue
 import pytest
 
 from confit import Config
+from confit.errors import ConfitValidationError
 
 
 def test_register_decorator(registry):
@@ -97,3 +98,21 @@ def test_cannot_store(registry):
         return None
 
     return_none()
+
+
+def test_register_class_without_init(registry):
+    @registry.misc.register("no-init")
+    class Metric:
+        def __call__(self, value):
+            return value
+
+    resolved = Config.from_str('[metric]\n"@misc" = "no-init"\n').resolve(
+        registry=registry
+    )
+    assert isinstance(resolved["metric"], Metric)
+    assert resolved.to_str() == '[metric]\n@misc = "no-init"\n\n'
+
+    with pytest.raises(ConfitValidationError, match="-> metric.foo\n"):
+        Config.from_str('[metric]\n"@misc" = "no-init"\nfoo = 1\n').resolve(
+            registry=registry
+        )
